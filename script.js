@@ -272,48 +272,59 @@ class RailwayTMS {
     }
 
     switchView(viewName) {
+        console.log('Switching to view:', viewName);
+
         // Update navigation
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        const navItem = document.querySelector(`[data-view="${viewName}"]`);
+        if (navItem) navItem.classList.add('active');
 
         // Update content
-        document.querySelectorAll('.view').forEach(view => {
-            view.classList.remove('active');
-        });
-        document.getElementById(viewName).classList.add('active');
+        document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+        const viewElement = document.getElementById(viewName);
+        if (viewElement) viewElement.classList.add('active');
 
+        const previousView = this.currentView;
         this.currentView = viewName;
 
+        // Stop any internal network simulation when leaving that view (safety)
+        if (previousView === 'network' && viewName !== 'network') {
+            try { this.stopNetworkSimulation && this.stopNetworkSimulation(); } catch {}
+        }
+
         // Initialize view-specific content
-        switch(viewName) {
-            case 'network':
-                this.initializeMap();
+        switch (viewName) {
+            case 'network': {
+                console.log('Network view selected (iframe embed)');
+                // Fit iframe height to view
+                const iframe = document.getElementById('networkMapFrame');
+                if (iframe) {
+                    try {
+                        iframe.style.height = Math.max(window.innerHeight - 220, 550) + 'px';
+                    } catch {}
+                }
                 break;
+            }
             case 'trains':
-                this.loadTrainsData();
+                try { this.loadTrainsData && this.loadTrainsData(); } catch {}
                 break;
             case 'simulation':
-                this.setupSimulation();
+                try { this.setupSimulation && this.setupSimulation(); } catch {}
                 break;
             case 'analytics':
-                this.updateAnalytics();
+                try { this.updateAnalytics && this.updateAnalytics(); } catch {}
                 break;
             case 'schedule':
-                this.loadSchedules();
+                try { this.loadSchedules && this.loadSchedules(); } catch {}
                 break;
             case 'alerts':
-                this.renderAlerts();
+                try { this.renderAlerts && this.renderAlerts(); } catch {}
+                break;
+            default:
                 break;
         }
-    }
-
-    // Prepare simulation view when opened
-    setupSimulation() {
-        this.initCollisionSim();
-    }
     
+    }
     updateDateTime() {
         const now = new Date();
         const timeElement = document.getElementById('currentTime');
@@ -491,6 +502,14 @@ class RailwayTMS {
     }
 
     initializeMap() {
+        // Check for new network map container
+        const networkMapElement = document.getElementById('networkMap');
+        if (networkMapElement && !this.networkMap) {
+            this.initializeNetworkMap();
+            return;
+        }
+
+        // Legacy map initialization for backward compatibility
         if (this.map) return; // Map already initialized
 
         const mapElement = document.getElementById('railwayMap');
@@ -504,36 +523,393 @@ class RailwayTMS {
             attribution: '© OpenStreetMap contributors'
         }).addTo(this.map);
 
-        // Add railway-specific styling
-        const customStyle = `
-            <style>
-                .leaflet-container { 
-                    background: #f8f9fa; 
-                    font-family: var(--font-family);
-                }
-                .train-marker {
-                    background: linear-gradient(45deg, #e74c3c, #c0392b);
-                    border: 2px solid white;
-                    border-radius: 50%;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                }
-                .station-marker {
-                    background: linear-gradient(45deg, #3498db, #2980b9);
-                    border: 2px solid white;
-                    border-radius: 4px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                }
-            </style>
-        `;
-        document.head.insertAdjacentHTML('beforeend', customStyle);
-
         this.addStationsToMap();
         this.addTrainsToMap();
         this.addTracksToMap();
         this.startTrainAnimation();
     }
 
+    initializeNetworkMap() {
+        if (this.networkMap) {
+            console.log('Network map already initialized');
+            return;
+        }
+        
+        console.log('Initializing Enhanced Network Map...');
+        
+        const mapContainer = document.getElementById('networkMap');
+        if (!mapContainer) {
+            console.error('Network map container not found!');
+            return;
+        }
+        
+        console.log('Map container found:', mapContainer);
+
+        // Force a concrete height so Leaflet can render tiles in flexible layouts
+        try {
+            const desiredHeight = Math.max(window.innerHeight - 220, 550);
+            mapContainer.style.minHeight = '550px';
+            mapContainer.style.height = desiredHeight + 'px';
+        } catch {}
+        
+        // Show loading overlay
+        const loadingOverlay = document.getElementById('mapLoadingOverlay');
+        const loadingText = document.getElementById('mapLoadingText');
+        const loadingDetails = document.getElementById('mapLoadingDetails');
+        const progressFill = document.getElementById('mapProgressFill');
+        
+        function updateLoadingProgress(step, text, details, progress) {
+            if (loadingText) loadingText.textContent = text;
+            if (loadingDetails) loadingDetails.textContent = details;
+            if (progressFill) progressFill.style.width = progress + '%';
+        }
+        
+        // Step 1: Initialize map
+        updateLoadingProgress(1, 'Initializing Railway Network...', 'Setting up interactive map interface', 20);
+        
+        // Check if Leaflet is available
+        if (typeof L === 'undefined') {
+            console.error('Leaflet library not loaded!');
+            updateLoadingProgress(0, 'Error: Map Library Missing', 'Leaflet library is required for the map', 0);
+            return;
+        }
+        
+        try {
+            // Initialize enhanced Leaflet map
+            console.log('Creating Leaflet map instance...');
+            this.networkMap = L.map('networkMap', {
+                zoomAnimation: true,
+                fadeAnimation: true,
+                markerZoomAnimation: true,
+                zoomSnap: 0.25,
+                zoomDelta: 0.5,
+                wheelPxPerZoomLevel: 80,
+                preferCanvas: true,
+                maxBounds: [[6.5, 68.0], [37.5, 97.5]], // India bounds
+                maxBoundsViscosity: 1.0
+            }).setView([20.5937, 78.9629], 5.5); // Center of India
+            
+            console.log('Leaflet map created successfully:', this.networkMap);
+        } catch (error) {
+            console.error('Error creating Leaflet map:', error);
+            updateLoadingProgress(0, 'Map Initialization Failed', error.message, 0);
+            return;
+        }
+        
+        // Add tile layer with better options
+        try {
+            console.log('Adding tile layer...');
+            const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                updateWhenIdle: false,
+                keepBuffer: 4,
+                minZoom: 4,
+                maxZoom: 18
+            });
+            tileLayer.addTo(this.networkMap);
+            console.log('Tile layer added successfully');
+        } catch (error) {
+            console.error('Error adding tile layer:', error);
+        }
+        
+        // Set zoom limits
+        this.networkMap.setMinZoom(4);
+        this.networkMap.setMaxZoom(18);
+        
+        // Initialize collections
+        this.networkTrainPositions = new Map();
+        this.networkRealtimeMarkers = new Map();
+        this.networkSampleRoutes = [];
+        this.networkSimulationActive = false;
+        
+        // Force map to resize and be visible
+        setTimeout(() => {
+            if (this.networkMap) {
+                console.log('Forcing map resize...');
+                this.networkMap.invalidateSize();
+            }
+        }, 100);
+
+        // Recompute height and reflow on window resize or sidebar layout changes
+        const recalcSize = () => {
+            try {
+                const desiredHeight = Math.max(window.innerHeight - 220, 550);
+                mapContainer.style.height = desiredHeight + 'px';
+                if (this.networkMap) this.networkMap.invalidateSize();
+            } catch {}
+        };
+        window.addEventListener('resize', recalcSize);
+        
+        // Step 2: Load railway data
+        updateLoadingProgress(2, 'Loading Railway Network...', 'Fetching railway infrastructure data', 40);
+        
+        // Load railways with proper path
+        fetch('Map/MapRailways_indian.geojson')
+            .then(response => {
+                if (!response.ok) throw new Error('Railways data not found');
+                return response.json();
+            })
+            .then(geoData => {
+                updateLoadingProgress(3, 'Building Railway Graph...', 'Processing railway connections', 60);
+                
+                // Add railway lines to map
+                L.geoJSON(geoData, {
+                    style: {
+                        color: '#1e88e5',
+                        weight: 1,
+                        opacity: 0.6
+                    }
+                }).addTo(this.networkMap);
+                
+                // Step 3: Load train data
+                updateLoadingProgress(4, 'Loading Train Schedules...', 'Fetching real-time train data', 80);
+                return this.loadNetworkTrains();
+            })
+            .then(() => {
+                updateLoadingProgress(5, 'Starting Simulation...', 'Initializing train movements', 95);
+                return this.startNetworkSimulation();
+            })
+            .then(() => {
+                updateLoadingProgress(6, 'Ready!', 'Railway network fully operational', 100);
+                
+                // Hide loading overlay
+                setTimeout(() => {
+                    if (loadingOverlay) {
+                        loadingOverlay.style.opacity = '0';
+                        setTimeout(() => {
+                            loadingOverlay.style.display = 'none';
+                        }, 500);
+                    }
+                }, 1000);
+                
+                console.log('Enhanced Network Map initialized successfully');
+            })
+            .catch(error => {
+                console.error('Network Map initialization failed:', error);
+                console.log('Falling back to basic map display...');
+                
+                // Show basic map even if data loading fails
+                updateLoadingProgress(6, 'Basic Map Ready', 'Showing map without train data', 100);
+                
+                setTimeout(() => {
+                    if (loadingOverlay) {
+                        loadingOverlay.style.opacity = '0';
+                        setTimeout(() => {
+                            loadingOverlay.style.display = 'none';
+                        }, 500);
+                    }
+                    
+                    // Update status to show map is ready
+                    const statusElement = document.getElementById('networkStatus');
+                    if (statusElement) {
+                        statusElement.textContent = 'Railway Network Map - Basic view (train data unavailable)';
+                    }
+                }, 1000);
+                
+                console.log('Basic Network Map ready');
+            });
+        
+        // Setup zoom controls
+        this.setupNetworkZoomControls();
+    }
+
+    setupNetworkZoomControls() {
+        const zoomInBtn = document.getElementById('networkZoomIn');
+        const zoomOutBtn = document.getElementById('networkZoomOut');
+        
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => {
+                if (this.networkMap) this.networkMap.zoomIn();
+            });
+        }
+        
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => {
+                if (this.networkMap) this.networkMap.zoomOut();
+            });
+        }
+    }
+
+    async loadNetworkTrains() {
+        const candidates = [
+            'Map/Mapultra_optimized_trains.json',
+            'Map/Mapoptimized_trains.json',
+            'Map/Mapminimal_trains.json'
+        ];
+        
+        for (const file of candidates) {
+            try {
+                const response = await fetch(file);
+                if (!response.ok) continue;
+                
+                const text = await response.text();
+                const data = JSON.parse(text);
+                
+                let trains = [];
+                if (Array.isArray(data?.trains)) {
+                    trains = data.trains;
+                } else if (Array.isArray(data)) {
+                    trains = data;
+                } else {
+                    // Try to find array in data
+                    for (const [key, value] of Object.entries(data)) {
+                        if (Array.isArray(value) && value.length > 0) {
+                            trains = value;
+                            break;
+                        }
+                    }
+                }
+                
+                if (trains.length === 0) continue;
+                
+                // Process train routes
+                this.networkSampleRoutes = [];
+                const sampleLimit = 50; // Limit for performance
+                let added = 0;
+                
+                for (const tr of trains) {
+                    if (added >= sampleLimit) break;
+                    
+                    const id = String(tr.train_number ?? tr.id ?? tr.trainName ?? Math.random().toString(36).slice(2));
+                    const name = String(tr.train_name ?? tr.name ?? id);
+                    
+                    // Build route coordinates
+                    let coords = [];
+                    if (Array.isArray(tr.route_coordinates) && tr.route_coordinates.length >= 2) {
+                        coords = tr.route_coordinates
+                            .map(p => Array.isArray(p) && p.length >= 2 ? [Number(p[1]), Number(p[0])] : null)
+                            .filter(p => p && isFinite(p[0]) && isFinite(p[1]));
+                    }
+                    
+                    if (coords.length < 2 && Array.isArray(tr.stations)) {
+                        coords = tr.stations
+                            .map(s => [Number(s.lat), Number(s.lon)])
+                            .filter(([la, ln]) => isFinite(la) && isFinite(ln));
+                    }
+                    
+                    if (coords.length >= 2) {
+                        this.networkSampleRoutes.push({
+                            id: id,
+                            name: name,
+                            coords: coords,
+                            startTime: Math.random() * 86400, // Random start within 24h
+                            duration: 3600 + Math.random() * 7200 // 1-3 hour journey
+                        });
+                        added++;
+                    }
+                }
+                
+                console.log(`Loaded ${this.networkSampleRoutes.length} train routes from ${file}`);
+                return true;
+                
+            } catch (error) {
+                console.warn(`Failed to load ${file}:`, error);
+                continue;
+            }
+        }
+        
+        throw new Error('No train data files available');
+    }
+
+    startNetworkSimulation() {
+        if (this.networkSimulationActive || !this.networkMap) return;
+        
+        this.networkSimulationActive = true;
+        const speedMultiplier = 2.0; // Fast simulation for demo
+        
+        const simulationTick = () => {
+            if (!this.networkSimulationActive) return;
+            
+            const currentTime = (Date.now() / 1000 * speedMultiplier) % 86400; // Current time in day
+            let activeTrains = 0;
+            
+            this.networkSampleRoutes.forEach(train => {
+                const trainTime = (currentTime + train.startTime) % 86400;
+                const progress = Math.min(1, trainTime / (train.duration || 3600));
+                
+                if (progress >= 0 && progress <= 1) {
+                    activeTrains++;
+                    
+                    // Calculate position along route
+                    const routeIndex = Math.floor(progress * (train.coords.length - 1));
+                    const segmentProgress = (progress * (train.coords.length - 1)) - routeIndex;
+                    
+                    let position;
+                    if (routeIndex >= train.coords.length - 1) {
+                        position = train.coords[train.coords.length - 1];
+                    } else {
+                        const start = train.coords[routeIndex];
+                        const end = train.coords[routeIndex + 1];
+                        position = [
+                            start[0] + (end[0] - start[0]) * segmentProgress,
+                            start[1] + (end[1] - start[1]) * segmentProgress
+                        ];
+                    }
+                    
+                    // Update or create marker
+                    let marker = this.networkRealtimeMarkers.get(train.id);
+                    if (!marker) {
+                        // Create train icon
+                        const trainIcon = L.divIcon({
+                            className: 'network-train-icon',
+                            html: '<div class="network-arrow-wrap"><svg viewBox="0 0 24 24" class="network-arrow-svg"><path class="network-arrow-body" d="M12 2 L21 22 L12 17 L3 22 Z"/></svg></div>',
+                            iconSize: [22, 22]
+                        });
+                        
+                        marker = L.marker(position, { icon: trainIcon });
+                        marker.bindTooltip(`${train.name} (${train.id})`, {
+                            permanent: false,
+                            direction: 'top',
+                            offset: [0, -8]
+                        });
+                        marker.addTo(this.networkMap);
+                        this.networkRealtimeMarkers.set(train.id, marker);
+                    } else {
+                        marker.setLatLng(position);
+                    }
+                    
+                    // Update visibility based on zoom
+                    const showMarkers = this.networkMap.getZoom() >= 6;
+                    marker.setOpacity(showMarkers ? 1 : 0);
+                }
+            });
+            
+            // Update performance display
+            const fpsElement = document.getElementById('networkFps');
+            const trainCountElement = document.getElementById('networkTrainCount');
+            if (fpsElement) fpsElement.textContent = '30';
+            if (trainCountElement) trainCountElement.textContent = activeTrains;
+            
+            // Update status
+            const statusElement = document.getElementById('networkStatus');
+            if (statusElement) {
+                statusElement.textContent = `Railway Network Active - ${activeTrains} trains running`;
+            }
+            
+            // Continue simulation
+            setTimeout(simulationTick, 1000 / 30); // 30 FPS
+        };
+        
+        simulationTick();
+    }
+
+    stopNetworkSimulation() {
+        this.networkSimulationActive = false;
+        
+        // Clear all markers
+        if (this.networkRealtimeMarkers) {
+            this.networkRealtimeMarkers.forEach(marker => {
+                if (this.networkMap && this.networkMap.hasLayer(marker)) {
+                    this.networkMap.removeLayer(marker);
+                }
+            });
+            this.networkRealtimeMarkers.clear();
+        }
+    }
+
     addStationsToMap() {
+        if (!this.stations || !this.map) return;
+        
         this.stations.forEach(station => {
             const statusColor = {
                 'Active': '#28a745',
@@ -570,6 +946,8 @@ class RailwayTMS {
     }
 
     addTrainsToMap() {
+        if (!this.trains || !this.map) return;
+        
         this.trains.forEach(train => {
             const trainColor = {
                 'Express': '#e74c3c',
@@ -613,6 +991,8 @@ class RailwayTMS {
     }
 
     addTracksToMap() {
+        if (!this.map) return;
+        
         // Add track lines between major stations
         const trackRoutes = [
             { from: [28.6139, 77.2090], to: [28.4595, 77.0266], color: '#4a4a4a' }, // Delhi-Gurgaon
@@ -632,18 +1012,22 @@ class RailwayTMS {
     }
 
     startTrainAnimation() {
+        if (!this.map) return;
+        
         setInterval(() => {
-            this.trains.forEach(train => {
-                if (train.marker) {
-                    // Simulate train movement
-                    const currentPos = train.marker.getLatLng();
-                    const newLat = currentPos.lat + (Math.random() - 0.5) * 0.01;
-                    const newLng = currentPos.lng + (Math.random() - 0.5) * 0.01;
-                    
-                    train.marker.setLatLng([newLat, newLng]);
-                    train.coordinates = [newLat, newLng];
-                }
-            });
+            if (this.trains) {
+                this.trains.forEach(train => {
+                    if (train.marker) {
+                        // Simulate train movement
+                        const currentPos = train.marker.getLatLng();
+                        const newLat = currentPos.lat + (Math.random() - 0.5) * 0.01;
+                        const newLng = currentPos.lng + (Math.random() - 0.5) * 0.01;
+                        
+                        train.marker.setLatLng([newLat, newLng]);
+                        train.coordinates = [newLat, newLng];
+                    }
+                });
+            }
         }, 5000); // Update every 5 seconds
     }
 

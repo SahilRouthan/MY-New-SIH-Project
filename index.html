@@ -10,6 +10,246 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="icon" type="image/x-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMDA0ODg1Ii8+CjxwYXRoIGQ9Ik04IDE2SDE2VjI0SDhWMTZaIiBmaWxsPSIjRkZGRkZGIi8+CjxwYXRoIGQ9Ik0xNiA4SDI0VjE2SDE2VjhaIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=">
+    <style>
+        /* Network Map Styles */
+        .network-view {
+            position: relative;
+            height: calc(100vh - 160px); /* Account for header and padding */
+            overflow: hidden;
+        }
+        
+        .network-map-container {
+            height: 100%;
+            width: 100%;
+            position: relative;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        /* Ensure Leaflet internal container fills map area */
+        .network-map-container .leaflet-container,
+        .network-map-container .leaflet-pane,
+        .network-map-container .leaflet-map-pane {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        .network-trains-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 900;
+        }
+        
+        /* Network Map Controls */
+        .network-zoom-controls {
+            position: absolute;
+            z-index: 1000;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .network-zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        
+        .network-zoom-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .network-zoom-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+        
+        .network-status {
+            position: absolute;
+            z-index: 1000;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-family: system-ui, Arial, sans-serif;
+            font-size: 13px;
+            max-width: 50ch;
+        }
+        
+        .network-performance {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        .network-legend {
+            position: absolute;
+            z-index: 1000;
+            top: 120px;
+            right: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 8px 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            font-family: system-ui, Arial, sans-serif;
+            font-size: 12px;
+            max-height: 35vh;
+            overflow: auto;
+        }
+        /* Subtle background while tiles load */
+        #networkMap { background: #f5f7fb; }
+        /* Iframe map embed */
+        .network-map-iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+            display: block;
+            background: #f5f7fb;
+        }
+        
+        /* Train Icon Styles */
+        .network-train-icon { 
+            width: 22px;
+            height: 22px;
+            pointer-events: none;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.25));
+            transform: translateZ(0);
+            will-change: transform;
+        }
+        
+        .network-arrow-wrap { 
+            width: 22px; 
+            height: 22px; 
+            transform-origin: 50% 50%; 
+            transition: transform 0.1s linear; 
+        }
+        
+        .network-arrow-svg { 
+            display: block; 
+            width: 100%; 
+            height: 100%; 
+        }
+        
+        .network-arrow-body { 
+            fill: #ff4444; 
+            stroke: rgba(0,0,0,0.15); 
+            stroke-width: 0.5; 
+        }
+        
+        /* Loading Styles */
+        .map-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(2px);
+        }
+        
+        .map-loading-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            min-width: 300px;
+        }
+        
+        .map-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2196F3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .map-loading-text {
+            color: #333;
+            font-family: system-ui, Arial, sans-serif;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+        
+        .map-loading-details {
+            color: #666;
+            font-family: system-ui, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .map-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .map-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2196F3, #21CBF3);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        /* Smooth tile transitions */
+        .leaflet-tile {
+            transition: opacity 0.2s ease-in-out;
+        }
+        
+        .leaflet-tile-container {
+            transform: translateZ(0);
+        }
+        
+        .leaflet-zoom-animated {
+            transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -296,43 +536,7 @@
 
                 <!-- Network Map View -->
                 <div class="view network-view" id="network">
-                    <div class="view-header">
-                        <h1>Interactive Network Map</h1>
-                        <div class="view-actions">
-                            <div class="map-controls">
-                                <button class="btn btn-outline" id="toggleTrains">
-                                    <i class="fas fa-train"></i>
-                                    Show Trains
-                                </button>
-                                <button class="btn btn-outline" id="toggleStations">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    Show Stations
-                                </button>
-                                <button class="btn btn-outline" id="toggleSignals">
-                                    <i class="fas fa-traffic-light"></i>
-                                    Show Signals
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="map-container">
-                        <div id="railwayMap" class="railway-map"></div>
-                        <div class="map-legend">
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: #28a745;"></span>
-                                <span>Normal Speed</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: #ffc107;"></span>
-                                <span>Reduced Speed</span>
-                            </div>
-                            <div class="legend-item">
-                                <span class="legend-color" style="background: #dc3545;"></span>
-                                <span>Stopped/Delayed</span>
-                            </div>
-                        </div>
-                    </div>
+                    <iframe id="networkMapFrame" class="network-map-iframe" src="Map/Mapindex.html" title="Network Map" loading="lazy"></iframe>
                 </div>
 
                 <!-- Train Management View -->
@@ -916,5 +1120,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="demo-config.js"></script>
     <script src="script.js"></script>
+
 </body>
 </html>
