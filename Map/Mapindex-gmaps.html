@@ -1,0 +1,278 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>India Railway Router (Google Maps)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100vh; width: 100%; }
+    .status {
+      position: absolute;
+      z-index: 1000;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 12px;
+      max-width: 50ch;
+    }
+    .legend {
+      position: absolute; z-index: 1000; top: 10px; right: 10px;
+      background: rgba(255,255,255,0.95); padding: 8px 10px; border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15); font-family: system-ui, Arial, sans-serif; font-size: 12px;
+      max-height: 35vh; overflow: auto;
+    }
+    .legend .item { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    .legend .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid #0002; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="status" id="status">Loading Google Mapâ€¦</div>
+  <div class="legend" id="legend" hidden>
+    <div><strong>Scheduled Trains</strong></div>
+    <div id="legendItems"></div>
+  </div>
+
+  <script>
+    let map;
+    const statusEl = document.getElementById('status');
+    const legendEl = document.getElementById('legend');
+    const legendItemsEl = document.getElementById('legendItems');
+
+    const INDIA_BOUNDS = { south: 6.0, west: 68.0, north: 37.0, east: 97.0 };
+    const markerVisibilityZoom = 4;
+
+    function setStatus(msg) { if (statusEl) statusEl.textContent = msg; }
+
+    function initMap() {
+      const center = { lat: 20.5937, lng: 78.9629 };
+      map = new google.maps.Map(document.getElementById('map'), {
+        center,
+        zoom: 5,
+        gestureHandling: 'greedy',
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        restriction: { latLngBounds: INDIA_BOUNDS, strictBounds: true },
+      });
+      setStatus('Map ready. Loading railwaysâ€¦');
+
+      // Style for railways
+      map.data.setStyle({
+        strokeColor: '#2196F3', strokeOpacity: 0.9, strokeWeight: 1.5,
+      });
+
+      // Load railway GeoJSON
+      fetch('MapRailways_indian.geojson')
+        .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+        .then(geo => {
+          map.data.addGeoJson(geo);
+          setStatus('Railways loaded. Loading trainsâ€¦');
+          // Fit to bounds of data if possible
+          try {
+            const bounds = new google.maps.LatLngBounds();
+            geo.features.forEach(f => {
+              const g = f.geometry; if (!g) return;
+              if (g.type === 'LineString') {
+                g.coordinates.forEach(([lng, lat]) => bounds.extend({lat, lng}));
+              } else if (g.type === 'MultiLineString') {
+                g.coordinates.forEach(line => line.forEach(([lng, lat]) => bounds.extend({lat, lng})));
+              }
+            });
+            if (!bounds.isEmpty()) map.fitBounds(bounds);
+          } catch {}
+          // Start sample routes realtime
+          startSampleRoutesRealtime('ultra_Mapoptimized_trains.json');
+        })
+        .catch(err => {
+          console.error('Railways load failed:', err);
+          setStatus('Failed to load MapRailways_indian.geojson');
+          startSampleRoutesRealtime('ultra_Mapoptimized_trains.json');
+        });
+    }
+
+    // Utilities similar to your Leaflet version
+    function parseJsonLoose(text) {
+      if (typeof text !== 'string') return text;
+      const stripBOM = (t) => t.replace(/^\uFEFF/, '');
+      let t = stripBOM(text);
+      try { return JSON.parse(t); } catch (e1) {
+        try {
+          const noBlock = t.replace(/\/\*[\s\S]*?\*\//g, '');
+          const noLine = noBlock.replace(/(^|[^:])\/\/.*$/gm, '$1');
+          const noTrailing = noLine.replace(/,\s*([}\]])/g, '$1');
+          return JSON.parse(noTrailing);
+        } catch (e2) { return null; }
+      }
+    }
+
+    function parseHMSToSec(s) {
+      if (!s || typeof s !== 'string') return null;
+      const m = s.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!m) return null;
+      const hh = Math.min(23, parseInt(m[1], 10));
+      const mm = parseInt(m[2], 10);
+      const ss = m[3] ? parseInt(m[3], 10) : 0;
+      return hh * 3600 + mm * 60 + ss;
+    }
+    function nowSecOfDay() {
+      const d = new Date();
+      return d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds();
+    }
+    function toLatLngPair(p) {
+      if (!Array.isArray(p) || p.length < 2) return null;
+      const a = Number(p[1]); // lat
+      const b = Number(p[0]); // lng
+      if (!isFinite(a) || !isFinite(b)) return null;
+      return [a, b];
+    }
+    function computeCumulativeKm(latlngs) {
+      const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const R = 6371; const toRad = x => x * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1); const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+      const cum = [0];
+      for (let i = 1; i < latlngs.length; i++) {
+        const [la1, ln1] = latlngs[i-1];
+        const [la2, ln2] = latlngs[i];
+        const d = haversineKm(la1, ln1, la2, ln2);
+        cum.push(cum[cum.length - 1] + d);
+      }
+      return { cum, total: cum[cum.length - 1] };
+    }
+    function posAlongPolyline(latlngs, cum, targetKm) {
+      if (!latlngs.length) return null;
+      if (targetKm <= 0) return latlngs[0];
+      const total = cum[cum.length - 1];
+      if (targetKm >= total) return latlngs[latlngs.length - 1];
+      let i = 1; while (i < cum.length && cum[i] < targetKm) i++;
+      const prevKm = cum[i-1]; const nextKm = cum[i]; const seg = nextKm - prevKm;
+      const r = seg > 0 ? (targetKm - prevKm) / seg : 0;
+      const [la1, ln1] = latlngs[i-1]; const [la2, ln2] = latlngs[i];
+      return [la1 + (la2 - la1) * r, ln1 + (ln2 - ln1) * r];
+    }
+
+    // Legend helper
+    function addLegendItem(id, color, label) {
+      const div = document.createElement('div');
+      div.className = 'item';
+      const sw = document.createElement('span');
+      sw.className = 'swatch'; sw.style.background = color;
+      const txt = document.createElement('span'); txt.textContent = label || String(id);
+      div.appendChild(sw); div.appendChild(txt);
+      legendItemsEl.appendChild(div); legendEl.hidden = false;
+    }
+
+    // Main sample routes simulation (Google Maps)
+    const realtimeMarkerById = new Map();
+    function startSampleRoutesRealtime(file) {
+      fetch(file)
+        .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}: ${r.statusText}`))
+        .then(t => parseJsonLoose(t))
+        .then(json => {
+          let trains = [];
+          if (Array.isArray(json?.trains)) trains = json.trains; else if (Array.isArray(json)) trains = json; else if (json?.data && Array.isArray(json.data)) trains = json.data; else trains = [];
+          if (!trains.length) throw new Error('No trains array found');
+
+          const params = new URLSearchParams(window.location.search);
+          const sampleLimit = Number(params.get('sampleLimit') || 75);
+          const sampleSimRoutes = [];
+          let added = 0;
+          for (const tr of trains) {
+            if (added >= sampleLimit) break;
+            const id = String(tr.train_number ?? tr.id ?? tr.trainName ?? Math.random().toString(36).slice(2));
+            const name = String(tr.train_name ?? tr.name ?? id);
+            let coords = [];
+            if (Array.isArray(tr.route_coordinates) && tr.route_coordinates.length >= 2) {
+              coords = tr.route_coordinates.map(toLatLngPair).filter(Boolean);
+            }
+            if (coords.length < 2 && Array.isArray(tr.stations)) {
+              coords = tr.stations.map(s => [Number(s.lat), Number(s.lon)]).filter(([la, ln]) => isFinite(la) && isFinite(ln));
+            }
+            if (coords.length < 2) continue;
+            const { cum, total } = computeCumulativeKm(coords);
+            let t0 = (tr.departure && parseHMSToSec(tr.departure)) ?? null;
+            let t1 = (tr.arrival && parseHMSToSec(tr.arrival)) ?? null;
+            if (t0 == null || t1 == null) {
+              const st = Array.isArray(tr.stations) ? tr.stations : [];
+              const s0 = st.find(s => parseHMSToSec(s.departure) != null);
+              const s1 = [...st].reverse().find(s => parseHMSToSec(s.arrival) != null);
+              t0 = t0 ?? (s0 ? parseHMSToSec(s0.departure) : null);
+              t1 = t1 ?? (s1 ? parseHMSToSec(s1.arrival) : null);
+            }
+            if (t0 == null || t1 == null) { t0 = Math.random() * 86400; t1 = t0 + (3600 + Math.random() * 7200); }
+            if (t1 <= t0) t1 += 86400;
+            sampleSimRoutes.push({ id, name, coords, cum, totalKm: total, t0, t1 });
+            addLegendItem(id, `hsl(${Math.floor(Math.random()*360)} 85% 45%)`, `${id}: ${name}`);
+            added++;
+          }
+          if (!sampleSimRoutes.length) { setStatus('No valid routes'); return; }
+
+          // Animation loop
+          const speedMultiplier = 1.5;
+          function tick() {
+            const baseNow = nowSecOfDay() * speedMultiplier;
+            const showByZoom = map.getZoom() >= markerVisibilityZoom;
+            const offsets = [-86400, 0, 86400];
+            let activeTrains = 0;
+            for (const tr of sampleSimRoutes) {
+              let pos = null;
+              for (const off of offsets) {
+                const tNow = baseNow + off;
+                if (tNow < tr.t0 || tNow > tr.t1) continue;
+                const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
+                const targetKm = r * tr.totalKm;
+                pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
+                break;
+              }
+              if (!pos) continue;
+              activeTrains++;
+              const id = String(tr.id);
+              let m = realtimeMarkerById.get(id);
+              const position = new google.maps.LatLng(pos[0], pos[1]);
+              if (!m) {
+                m = new google.maps.Marker({
+                  position, map,
+                  title: id,
+                  icon: {
+                    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                    scale: 3.2,
+                    fillColor: '#FF4444',
+                    fillOpacity: 1,
+                    strokeColor: '#b00000',
+                    strokeWeight: 1
+                  },
+                  opacity: showByZoom ? 1 : 0
+                });
+                realtimeMarkerById.set(id, m);
+              } else {
+                m.setPosition(position);
+                m.setOpacity(showByZoom ? 1 : 0);
+              }
+            }
+            setStatus(`Active trains: ${activeTrains} / ${sampleSimRoutes.length}`);
+            window.requestAnimationFrame(tick);
+          }
+          window.requestAnimationFrame(tick);
+        })
+        .catch(err => {
+          console.error('Train routes load failed:', err);
+          setStatus('Failed to load train routes');
+        });
+    }
+
+    // Expose initMap globally for Google callback
+    window.initMap = initMap;
+  </script>
+
+  <!-- Google Maps JavaScript API: replace YOUR_API_KEY below -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"></script>
+</body>
+</html>

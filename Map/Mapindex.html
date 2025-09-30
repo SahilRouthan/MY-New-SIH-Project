@@ -1,0 +1,1441 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>India Railway Router Â· Start â†’ End on Tracks</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    #map { 
+      height: 100vh; 
+      /* Hardware acceleration for ultra-smooth zooming */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      will-change: transform;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    /* Zoom Controls */
+    .zoom-controls {
+      position: absolute;
+      z-index: 1000;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    
+    .zoom-btn {
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+    
+    .zoom-btn:hover {
+      background: rgba(255, 255, 255, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    .zoom-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    
+    .zoom-btn:first-child {
+      border-bottom: none;
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    
+    .zoom-btn:last-child {
+      border-top: none;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+    .status {
+      position: absolute;
+      z-index: 1000;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 13px;
+      max-width: 50ch;
+    }
+    .train-icon { 
+      width: 22px;
+      height: 22px;
+      pointer-events: none;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.25));
+      transform: translateZ(0);
+      will-change: transform;
+    }
+    .arrow-wrap { width: 22px; height: 22px; transform-origin: 50% 50%; transition: transform 0.1s linear; }
+    .arrow-svg { display: block; width: 100%; height: 100%; }
+    .arrow-body { fill: #ff4444; stroke: rgba(0,0,0,0.15); stroke-width: 0.5; }
+    
+    /* Smooth tile transitions during zoom */
+    .leaflet-tile {
+      transition: opacity 0.2s ease-in-out;
+    }
+    
+    .leaflet-tile-container {
+      transform: translateZ(0);
+    }
+    
+    /* Smooth zoom animations */
+    .leaflet-zoom-animated {
+      transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .legend {
+      position: absolute;
+      z-index: 1000;
+      top: 100px;
+      right: 10px;
+      background: rgba(255,255,255,0.95);
+      padding: 8px 10px;
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 12px;
+      max-height: 35vh;
+      overflow: auto;
+    }
+    .legend .item { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    .legend .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid #0002; }
+    
+    /* Loading Spinner Styles */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+      backdrop-filter: blur(2px);
+    }
+    
+    .loading-container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      min-width: 300px;
+    }
+    
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #2196F3;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: #333;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    
+    .loading-details {
+      color: #666;
+      font-family: system-ui, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      margin: 15px 0;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2196F3, #21CBF3);
+      border-radius: 3px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Initializing Railway Network...</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="loading-details" id="loadingDetails">
+        Preparing to load railway data and train schedules
+      </div>
+    </div>
+  </div>
+
+  <div id="map"></div>
+  <!-- High-performance canvas overlay for rendering trains (used when many trains/zoomed out) -->
+  <canvas id="trainsCanvas" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index: 900;"></canvas>
+  
+  <!-- Zoom Controls -->
+  <div class="zoom-controls">
+    <div class="zoom-btn" id="zoomIn" title="Zoom In">+</div>
+    <div class="zoom-btn" id="zoomOut" title="Zoom Out">âˆ’</div>
+  </div>
+  
+  <div class="status" id="status">Loading railway networkâ€¦</div>
+  <div id="performance" style="position: absolute; top: 60px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px; border-radius: 4px; font-size: 12px; z-index: 1000;">
+    <div>FPS: <span id="fps">--</span></div>
+    <div>Trains: <span id="trainCount">--</span></div>
+  </div>
+  <div class="legend" id="legend" hidden>
+    <div><strong>Scheduled Trains</strong></div>
+    <div id="legendItems"></div>
+  </div>
+
+  <script>
+    // Initialize map with smooth zoom options - focused on India
+    const map = L.map('map', {
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+      zoomSnap: 0.25, // Smoother zoom increments
+      zoomDelta: 0.5, // Finer zoom control
+      wheelPxPerZoomLevel: 80, // Smoother mouse wheel zooming
+      preferCanvas: true, // Better performance for many markers
+      // Restrict view to India bounds
+      maxBounds: [[6.5, 68.0], [37.5, 97.5]], // India geographical bounds
+      maxBoundsViscosity: 1.0 // Keep within bounds
+    }).setView([20.5937, 78.9629], 5.5); // Center of India with better zoom
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Â© OpenStreetMap contributors',
+      updateWhenIdle: false, // Update tiles during zoom for smoother experience
+      keepBuffer: 4, // Keep more tiles in memory for smoother panning/zooming
+      minZoom: 4, // Minimum zoom to keep India in view
+      maxZoom: 18 // Maximum zoom for detailed view
+    }).addTo(map);
+    
+    // Set zoom limits on the map itself
+    map.setMinZoom(4);
+    map.setMaxZoom(18);
+
+    // --- Lightweight configuration (tunable via URL params) ---
+    const SimConfig = (() => {
+      const q = new URLSearchParams(location.search);
+      const liteParam = q.get('lite');
+      const LITE_MODE = liteParam === null ? true : liteParam !== '0';
+      return {
+        LITE_MODE,
+        TRAIN_SAMPLE_LIMIT: Number(q.get('sampleLimit') ?? (LITE_MODE ? 50 : 75)),
+        ROUTE_SIMPLIFY_KM: Number(q.get('simplifyKm') ?? (LITE_MODE ? 3 : 1)),
+        SNAP_STRICT_EVERY_N: Number(q.get('snapEvery') ?? (LITE_MODE ? 3 : 1)),
+        TARGET_FPS: Math.min(60, Math.max(20, Number(q.get('fps') ?? 40)))
+      };
+    })();
+
+  // Layers and global state
+    let railwayLayer = null;
+    let stationLayer = null;
+    const realtimeLayer = L.layerGroup().addTo(map); // holds realtime train markers
+    const stationIndex = new Map(); // name -> {lat, lng}
+  const stationIndexCi = new Map(); // lowercased name -> {lat, lng}
+    // Realtime marker registry (missing earlier)
+    const realtimeMarkerById = new Map(); // id -> L.marker
+    
+    // Object pooling for better performance
+    const markerPool = [];
+    const maxPoolSize = 150;
+    
+    function getPooledMarker(pos, icon) {
+      if (markerPool.length > 0) {
+        const marker = markerPool.pop();
+        marker.setLatLng(pos);
+        marker.setIcon(icon);
+        return marker;
+      }
+      return L.marker(pos, { icon });
+    }
+    
+    function returnMarkerToPool(marker) {
+      if (markerPool.length < maxPoolSize) {
+        marker.removeFrom(map);
+        markerPool.push(marker);
+      } else {
+        map.removeLayer(marker);
+      }
+    }
+
+  // Graph of railway vertices
+    const graph = new Map(); // key -> { lat, lng, neighbors: Map(key, distanceKm) }
+    const nodeKeys = []; // list of keys for iteration
+    const keyOf = (lat, lng) => `${lat.toFixed(5)},${lng.toFixed(5)}`; // dedupe tolerance ~1m-10m
+
+    const toLatLng = (coord) => [coord[1], coord[0]]; // [lng, lat] -> [lat, lng]
+
+    // Simple distance calculation without caching to prevent memory issues
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function ensureNode(lat, lng) {
+      const k = keyOf(lat, lng);
+      if (!graph.has(k)) {
+        graph.set(k, { lat, lng, neighbors: new Map() });
+        nodeKeys.push(k);
+      }
+      return graph.get(k);
+    }
+
+    function addEdge(lat1, lng1, lat2, lng2) {
+      const n1 = ensureNode(lat1, lng1);
+      const n2 = ensureNode(lat2, lng2);
+      const k1 = keyOf(lat1, lng1);
+      const k2 = keyOf(lat2, lng2);
+      const d = haversineKm(lat1, lng1, lat2, lng2);
+      const setMin = (from, to, dist) => {
+        const cur = from.neighbors.get(to);
+        if (cur === undefined || dist < cur) from.neighbors.set(to, dist);
+      };
+      setMin(n1, k2, d);
+      setMin(n2, k1, d);
+    }
+
+    // Spatial grid for fast nearest-node search (improves realism by allowing strict track snapping at scale)
+    const GRID_SIZE_DEG = 0.1; // ~11km lat, ~11km cos(lat) lon
+    const grid = new Map(); // cellKey -> array of nodeKeys
+    function gridKeyFor(lat, lng) { return `${Math.floor(lat / GRID_SIZE_DEG)},${Math.floor(lng / GRID_SIZE_DEG)}`; }
+    function gridInsertNode(nodeKey, lat, lng) {
+      const ck = gridKeyFor(lat, lng);
+      let arr = grid.get(ck);
+      if (!arr) { arr = []; grid.set(ck, arr); }
+      arr.push(nodeKey);
+    }
+    function buildGridIndex() {
+      grid.clear();
+      for (const k of nodeKeys) {
+        const n = graph.get(k);
+        if (n) gridInsertNode(k, n.lat, n.lng);
+      }
+      console.log(`Spatial grid ready with ${grid.size} cells for ${nodeKeys.length} nodes`);
+    }
+    function findNearestNode(lat, lng) {
+      if (grid.size === 0) {
+        // Fallback to full scan if grid not ready
+        let bestKey = null, bestDist = Infinity;
+        for (const k of nodeKeys) {
+          const n = graph.get(k);
+          const d = haversineKm(lat, lng, n.lat, n.lng);
+          if (d < bestDist) { bestDist = d; bestKey = k; }
+        }
+        return { key: bestKey, distKm: bestDist };
+      }
+      let bestKey = null, bestDist = Infinity;
+      const ci = Math.floor(lat / GRID_SIZE_DEG);
+      const cj = Math.floor(lng / GRID_SIZE_DEG);
+      const MAX_RING = 3; // search up to 3 rings (~30-35 km)
+      for (let r = 0; r <= MAX_RING; r++) {
+        let found = false;
+        for (let di = -r; di <= r; di++) {
+          for (let dj = -r; dj <= r; dj++) {
+            if (Math.abs(di) !== r && Math.abs(dj) !== r) continue; // ring perimeter only
+            const ck = `${ci + di},${cj + dj}`;
+            const arr = grid.get(ck);
+            if (!arr) continue;
+            found = true;
+            for (const k of arr) {
+              const n = graph.get(k);
+              const d = haversineKm(lat, lng, n.lat, n.lng);
+              if (d < bestDist) { bestDist = d; bestKey = k; }
+            }
+          }
+        }
+        if (bestKey && r >= 1) break; // found close enough
+        if (!found && r >= 1) break;   // no more data around
+      }
+      return { key: bestKey, distKm: bestDist };
+    }
+
+    // Snap a lat/lng to nearest graph node - ALWAYS snap to keep trains on tracks
+    function snapLatLngToTrack(lat, lng, maxKm = 2) {
+      if (!nodeKeys.length) return { lat, lng };
+      const { key, distKm } = findNearestNode(lat, lng);
+      if (!key) return { lat, lng };
+      const n = graph.get(key);
+      return { lat: n.lat, lng: n.lng };
+    }
+
+    // ULTRA-AGGRESSIVE track snapping - NEVER allow off-track trains
+    function snapToTrackStrict(lat, lng) {
+      if (!nodeKeys.length) return { lat, lng };
+      
+      // Find nearest railway node with NO distance limit
+      let bestKey = null;
+      let minDist = Infinity;
+      
+      // Check multiple nearby nodes for best alignment
+      for (const key of nodeKeys) {
+        const node = graph.get(key);
+        const dist = haversineKm(lat, lng, node.lat, node.lng);
+        if (dist < minDist) {
+          minDist = dist;
+          bestKey = key;
+        }
+      }
+      
+      if (bestKey) {
+        const n = graph.get(bestKey);
+        return { lat: n.lat, lng: n.lng };
+      }
+      
+      return { lat, lng };
+    }
+
+    // Min-heap priority queue for Dijkstra
+    class MinHeap {
+      constructor() { this.a = []; }
+      push(item) { this.a.push(item); this.bubbleUp(this.a.length - 1); }
+      bubbleUp(i) {
+        while (i > 0) {
+          const p = Math.floor((i - 1) / 2);
+          if (this.a[p][0] <= this.a[i][0]) break;
+          [this.a[p], this.a[i]] = [this.a[i], this.a[p]]; i = p;
+        }
+      }
+      pop() {
+        if (this.a.length === 0) return undefined;
+        const top = this.a[0];
+        const end = this.a.pop();
+        if (this.a.length > 0) { this.a[0] = end; this.sinkDown(0); }
+        return top;
+      }
+      sinkDown(i) {
+        const n = this.a.length;
+        while (true) {
+          let l = 2*i + 1, r = 2*i + 2, s = i;
+          if (l < n && this.a[l][0] < this.a[s][0]) s = l;
+          if (r < n && this.a[r][0] < this.a[s][0]) s = r;
+          if (s === i) break;
+          [this.a[i], this.a[s]] = [this.a[s], this.a[i]]; i = s;
+        }
+      }
+      get length() { return this.a.length; }
+    }
+
+    function dijkstra(startKey, endKey) {
+      const dist = new Map();
+      const prev = new Map();
+      const heap = new MinHeap();
+      for (const k of nodeKeys) dist.set(k, Infinity);
+      dist.set(startKey, 0);
+      heap.push([0, startKey]);
+      const visited = new Set();
+
+      while (heap.length) {
+        const [d, u] = heap.pop();
+        if (visited.has(u)) continue;
+        visited.add(u);
+        if (u === endKey) break;
+        const uNode = graph.get(u);
+        for (const [v, w] of uNode.neighbors) {
+          const nd = d + w;
+          if (nd < dist.get(v)) {
+            dist.set(v, nd);
+            prev.set(v, u);
+            heap.push([nd, v]);
+          }
+        }
+      }
+
+      if (!prev.has(endKey) && startKey !== endKey) return null;
+      // Reconstruct path
+      const path = [];
+      let cur = endKey;
+      path.push(cur);
+      while (cur !== startKey) {
+        const p = prev.get(cur);
+        if (!p) break; // start==end or no path
+        path.push(p);
+        cur = p;
+      }
+      path.reverse();
+      return path;
+    }
+
+    // Turn-constrained Dijkstra (minimum turn): state = (prevKey, curKey); reject transitions with turn < minTurnDeg at cur
+    function dijkstraTurnMin(startKey, endKey, minTurnDeg) {
+      const stateKey = (prev, cur) => `${prev ?? ''}->${cur}`;
+      const dist = new Map(); // stateKey -> distance
+      const prevState = new Map(); // stateKey -> prior stateKey
+      const heap = new MinHeap(); // [dist, prevKey, curKey]
+      const visited = new Set(); // stateKey
+
+      // Seed with a virtual start state (null -> start), expand to neighbors without angle check
+      const seedKey = stateKey(null, startKey);
+      dist.set(seedKey, 0);
+      heap.push([0, null, startKey]);
+
+      // Best end state encountered (any prev -> endKey)
+      let bestEndState = null;
+      let bestEndDist = Infinity;
+
+      while (heap.length) {
+        const [d, prevK, curK] = heap.pop();
+        const sk = stateKey(prevK, curK);
+        if (visited.has(sk)) continue;
+        visited.add(sk);
+        if (curK === endKey && d < bestEndDist) {
+          bestEndDist = d;
+          bestEndState = sk;
+          // Don't break; there might be an even shorter path via different prev
+        }
+        const curNode = graph.get(curK);
+        if (!curNode) continue;
+        for (const [nextK, w] of curNode.neighbors) {
+          // Enforce turn at cur for transition prevK -> curK -> nextK
+          if (prevK) {
+            const A = graph.get(prevK);
+            const B = curNode;
+            const C = graph.get(nextK);
+            if (!A || !B || !C) continue;
+            const ang = turnAngleDeg({lat:A.lat,lng:A.lng}, {lat:B.lat,lng:B.lng}, {lat:C.lat,lng:C.lng});
+            if (ang < minTurnDeg) continue; // too shallow, skip
+          }
+          const nd = d + w;
+          const nsk = stateKey(curK, nextK);
+          if (nd < (dist.get(nsk) ?? Infinity)) {
+            dist.set(nsk, nd);
+            prevState.set(nsk, sk);
+            heap.push([nd, curK, nextK]);
+          }
+        }
+      }
+
+      if (!bestEndState) return null;
+      // Reconstruct path of node keys by following states' cur node back to start
+      const pathKeys = [];
+      let sk = bestEndState;
+      // Collect last state's cur node first
+      const parseSk = (s) => {
+        const [p, c] = s.split('->');
+        return { prev: p || null, cur: c };
+      };
+      while (sk) {
+        const { prev, cur } = parseSk(sk);
+        pathKeys.push(cur);
+        sk = prevState.get(sk) || null;
+        if (!sk) {
+          // Add the start node if not already present
+          if (prev) pathKeys.push(prev);
+        }
+      }
+      pathKeys.reverse();
+      return pathKeys;
+    }
+
+    // UI elements (simplified - only status and train toggle remain)
+    const statusEl = document.getElementById('status');
+    
+    // Loading overlay control functions
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const loadingDetails = document.getElementById('loadingDetails');
+    const progressFill = document.getElementById('progressFill');
+    
+    let loadingSteps = [];
+    let currentStep = 0;
+    
+    function initializeLoadingSteps() {
+      loadingSteps = [
+        { text: "Loading Railway Network...", details: "Fetching MapRailways_indian.geojson (~2MB)", progress: 20 },
+        { text: "Building Railway Graph...", details: "Processing railway nodes and connections", progress: 40 },
+        { text: "Loading Station Data...", details: "Fetching station coordinates and names", progress: 60 },
+        { text: "Loading Train Schedules...", details: "Fetching ultra-optimized train data", progress: 80 },
+        { text: "Starting Train Simulation...", details: "Initializing real-time train movements", progress: 95 },
+        { text: "Ready!", details: "Railway system fully operational", progress: 100 }
+      ];
+    }
+    
+    function updateLoadingStep(stepIndex, customText = null, customDetails = null) {
+      if (stepIndex >= loadingSteps.length) return;
+      
+      currentStep = stepIndex;
+      const step = loadingSteps[stepIndex];
+      
+      loadingText.textContent = customText || step.text;
+      loadingDetails.textContent = customDetails || step.details;
+      progressFill.style.width = step.progress + '%';
+      
+      console.log(`Loading Step ${stepIndex + 1}/${loadingSteps.length}: ${step.text}`);
+    }
+    
+    function hideLoadingOverlay() {
+      setTimeout(() => {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+        }, 500);
+      }, 1000); // Show "Ready!" for 1 second before hiding
+    }
+    
+    function showLoadingError(errorMessage) {
+      loadingText.textContent = "Loading Failed";
+      loadingDetails.textContent = errorMessage;
+      progressFill.style.background = '#f44336';
+      
+      // Add retry option
+      setTimeout(() => {
+        if (confirm("Failed to load railway data. Would you like to retry?")) {
+          location.reload();
+        } else {
+          hideLoadingOverlay();
+        }
+      }, 2000);
+    }
+    
+    // Initialize loading steps
+    initializeLoadingSteps();
+    updateLoadingStep(0);
+
+  // Removed manual train animation - using optimized simulation only
+
+  // Scheduled trains (multiple)
+  const scheduledTrains = new Map(); // id -> state
+  let scheduledAnimTimer = null;
+  let scheduledPaused = false;
+  let schedulesLoaded = false;
+  const legendEl = document.getElementById('legend');
+  const legendItemsEl = document.getElementById('legendItems');
+  // Single-track occupancy (undirected edge between two nodes)
+  const trackOccupancy = new Map(); // edgeKey -> trainId
+  const edgeKeyOf = (k1, k2) => {
+    const a = String(k1), b = String(k2);
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+  };
+  function tryAcquireEdge(trainId, edgeKey) {
+    const holder = trackOccupancy.get(edgeKey);
+    if (!holder) { trackOccupancy.set(edgeKey, trainId); return true; }
+    return holder === trainId;
+  }
+  function releaseEdge(trainId, edgeKey) {
+    const holder = trackOccupancy.get(edgeKey);
+    if (holder === trainId) trackOccupancy.delete(edgeKey);
+  }
+
+    // Zoom-based visibility: show markers only when zoomed in enough
+    const markerVisibilityZoom = 4; // Visible from default zoom for better simulation
+    const stationVisibilityZoom = 12; // Much higher zoom required to see stations (avoid clutter)
+  // Train markers always visible (toggle removed)
+      let showTrainMarkers = true; // always visible for main simulation
+
+      function applyTrainMarkerVisibility() {
+        // Scheduled trains
+        for (const t of scheduledTrains.values()) {
+          if (!t.marker) continue;
+          if (showTrainMarkers) {
+            if (!map.hasLayer(t.marker)) t.marker.addTo(map);
+            const show = map.getZoom() >= markerVisibilityZoom && !!t.started;
+            t.marker.setOpacity(show ? 1 : 0);
+          } else {
+            if (map.hasLayer(t.marker)) map.removeLayer(t.marker);
+          }
+        }
+        // Realtime markers (including simulation markers added to realtimeLayer)
+        realtimeLayer.eachLayer(layer => {
+          if (showTrainMarkers) {
+            if (!map.hasLayer(realtimeLayer)) realtimeLayer.addTo(map);
+            setMarkerVisible(layer, map.getZoom() >= markerVisibilityZoom);
+          } else {
+            if (map.hasLayer(realtimeLayer)) map.removeLayer(realtimeLayer);
+          }
+        });
+      }
+    function setMarkerVisible(marker, visible) {
+      if (!marker) return;
+      
+      // Cache current state to avoid unnecessary DOM updates
+      const currentOpacity = marker._currentOpacity;
+      const targetOpacity = visible ? 1 : 0;
+      
+      if (currentOpacity !== targetOpacity) {
+        marker.setOpacity(targetOpacity);
+        marker._currentOpacity = targetOpacity;
+        
+        // Only handle tooltips if they exist and state changed
+        if (marker.getTooltip && marker.getTooltip()) {
+          if (visible) marker.openTooltip(); else marker.closeTooltip();
+        }
+      }
+    }
+    // Zoom-aware performance system for ultra-smooth zooming
+    let zoomTimeout = null;
+    let lastZoomLevel = map.getZoom();
+    let isZooming = false;
+    
+    function updateVisibilityForZoom() {
+      const currentZoom = map.getZoom();
+      const showTrains = currentZoom >= markerVisibilityZoom;
+      const showStations = currentZoom >= stationVisibilityZoom;
+      
+      // Skip if zoom level hasn't meaningfully changed
+      if (Math.abs(currentZoom - lastZoomLevel) < 0.1) return;
+      lastZoomLevel = currentZoom;
+      
+      // Use requestAnimationFrame for smooth updates
+      requestAnimationFrame(() => {
+        // Batch station layer updates
+        if (stationLayer) {
+          if (!map.hasLayer(stationLayer)) stationLayer.addTo(map);
+          // More efficient station visibility toggle
+          const stationOpacity = showStations ? 1 : 0;
+          const stationFillOpacity = showStations ? 0.6 : 0;
+          stationLayer.eachLayer(l => { 
+            if (l.setStyle) l.setStyle({ opacity: stationOpacity, fillOpacity: stationFillOpacity }); 
+          });
+        }
+        
+        // Batch train marker updates only if needed
+        if (showTrainMarkers) {
+          realtimeLayer.eachLayer(layer => setMarkerVisible(layer, showTrains));
+          
+          // More efficient scheduled train updates
+          for (const t of scheduledTrains.values()) {
+            if (!t.marker) continue;
+            const visible = showTrains && !!t.started;
+            setMarkerVisible(t.marker, visible);
+          }
+        }
+      });
+    }
+
+    // Ultra-smooth zoom handler with intelligent throttling
+    function throttledZoomHandler() {
+      isZooming = true;
+      clearTimeout(zoomTimeout);
+      zoomTimeout = setTimeout(updateVisibilityForZoom, 16); // ~60fps throttling
+    }
+    
+    // Separate handler for zoom end to ensure final state is correct
+    function zoomEndHandler() {
+      clearTimeout(zoomTimeout);
+      // Immediate update on zoom end for accuracy
+      requestAnimationFrame(() => {
+        updateVisibilityForZoom();
+        isZooming = false; // Resume normal train animation performance
+      });
+    }
+    
+    // Start zoom handler to set zooming state
+    function zoomStartHandler() {
+      isZooming = true;
+    }
+    
+    map.on('zoomstart', zoomStartHandler); // Detect zoom start
+    map.on('zoom', throttledZoomHandler); // Smooth updates during zoom
+    map.on('zoomend', zoomEndHandler); // Final accurate update
+    // Zoom control functionality
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomOutBtn = document.getElementById('zoomOut');
+    
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', () => {
+        map.zoomIn();
+      });
+    }
+    
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', () => {
+        map.zoomOut();
+      });
+    }
+
+    // Geometry helpers for realistic turning
+  function bearingDeg(p1, p2) {
+      const y = (p2.lng - p1.lng);
+      const x = (p2.lat - p1.lat);
+      const ang = Math.atan2(y, x) * 180 / Math.PI; // rough planar
+      return (ang + 360) % 360;
+    }
+    function turnAngleDeg(a, b, c) {
+      const br1 = bearingDeg(b, a);
+      const br2 = bearingDeg(b, c);
+      let d = Math.abs(br2 - br1);
+      if (d > 180) d = 360 - d;
+      return d; // 0 straight, 180 U-turn
+    }
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+
+    // Removed UI control functions and station popups - using map-only interface
+
+    function populateStationIndex(features) {
+      // Just populate the station index for internal use (no UI selects)
+      for (const f of features) {
+        const name = f.properties && (f.properties.name ?? f.properties['name:en'] ?? f.properties['Name']);
+        if (!name) continue;
+        const [lng, lat] = f.geometry.coordinates;
+        const rec = { lat, lng };
+        stationIndex.set(name, rec);
+        stationIndexCi.set(name.toLowerCase().trim(), rec);
+      }
+    }
+
+    // --- Utility helpers ported from original app ---
+    // Forgiving JSON parser: handles BOM, comments, trailing commas, and NDJSON fallback
+    function parseJsonLoose(text) {
+      if (typeof text !== 'string') return text;
+      const stripBOM = (t) => t.replace(/^\uFEFF/, '');
+      let t = stripBOM(text);
+      try { return JSON.parse(t); } catch (e1) {
+        try {
+          const noBlock = t.replace(/\/\*[\s\S]*?\*\//g, '');
+          const noLine = noBlock.replace(/(^|[^:])\/\/.*$/gm, '$1');
+          const noTrailing = noLine.replace(/,\s*([}\]])/g, '$1');
+          return JSON.parse(noTrailing);
+        } catch (e2) {
+          try {
+            const lines = t.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith('//'));
+            const arr = [];
+            for (const line of lines) { try { arr.push(JSON.parse(line)); } catch {} }
+            return arr.length ? arr : null;
+          } catch (e3) { return null; }
+        }
+      }
+    }
+    function toLatLngPair(p) {
+      if (!Array.isArray(p) || p.length < 2) return null;
+      const a = Number(p[1]); // lat
+      const b = Number(p[0]); // lng
+      if (!isFinite(a) || !isFinite(b)) return null;
+      return [a, b];
+    }
+    function computeCumulativeKm(latlngs) {
+      const cum = [0];
+      for (let i = 1; i < latlngs.length; i++) {
+        const [la1, ln1] = latlngs[i-1];
+        const [la2, ln2] = latlngs[i];
+        const d = haversineKm(la1, ln1, la2, ln2);
+        cum.push(cum[cum.length - 1] + d);
+      }
+      return { cum, total: cum[cum.length - 1] };
+    }
+    // Route simplification (Douglas-Peucker) using km distances for tolerance
+    function pointLineDistanceKm(p, a, b) {
+      // Convert to planar approx in degrees then scale by km using haversine per-segment
+      const [py, px] = p, [ay, ax] = a, [by, bx] = b; // lat, lng
+      const A = {x: ax, y: ay}, B = {x: bx, y: by}, P = {x: px, y: py};
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const len2 = dx*dx + dy*dy; if (len2 === 0) return haversineKm(ay, ax, py, px);
+      let t = ((P.x - A.x)*dx + (P.y - A.y)*dy) / len2; t = Math.max(0, Math.min(1, t));
+      const proj = { x: A.x + t*dx, y: A.y + t*dy };
+      return haversineKm(P.y, P.x, proj.y, proj.x);
+    }
+    function simplifyDP(coords, tolKm) {
+      if (!Array.isArray(coords) || coords.length <= 2) return coords;
+      const keep = new Array(coords.length).fill(false);
+      keep[0] = keep[coords.length - 1] = true;
+      const stack = [[0, coords.length - 1]];
+      while (stack.length) {
+        const [i0, i1] = stack.pop();
+        let maxD = -1, idx = -1;
+        for (let i = i0 + 1; i < i1; i++) {
+          const d = pointLineDistanceKm(coords[i], coords[i0], coords[i1]);
+          if (d > maxD) { maxD = d; idx = i; }
+        }
+        if (maxD > tolKm && idx > 0) {
+          keep[idx] = true;
+          stack.push([i0, idx], [idx, i1]);
+        }
+      }
+      const out = [];
+      for (let i = 0; i < coords.length; i++) if (keep[i]) out.push(coords[i]);
+      return out;
+    }
+    function simplifyPolylineKm(coords, tolKm) {
+      if (!tolKm || tolKm <= 0) return coords;
+      try { return simplifyDP(coords, tolKm); } catch { return coords; }
+    }
+    function posAlongPolyline(latlngs, cum, targetKm) {
+      if (!latlngs.length) return null;
+      if (targetKm <= 0) return latlngs[0];
+      const total = cum[cum.length - 1];
+      if (targetKm >= total) return latlngs[latlngs.length - 1];
+      let i = 1; while (i < cum.length && cum[i] < targetKm) i++;
+      const prevKm = cum[i-1], nextKm = cum[i];
+      const seg = nextKm - prevKm; const r = seg > 0 ? (targetKm - prevKm) / seg : 0;
+      const [la1, ln1] = latlngs[i-1]; const [la2, ln2] = latlngs[i];
+      return [la1 + (la2 - la1) * r, ln1 + (ln2 - ln1) * r];
+    }
+    function parseHMSToSec(s) {
+      if (!s || typeof s !== 'string') return null;
+      const m = s.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (!m) return null;
+      const hh = Math.min(23, parseInt(m[1], 10));
+      const mm = parseInt(m[2], 10);
+      const ss = m[3] ? parseInt(m[3], 10) : 0;
+      return hh * 3600 + mm * 60 + ss;
+    }
+    function nowSecOfDay() { const d = new Date(); return d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds(); }
+
+    function buildGraphFromGeoJSON(data) {
+      let lineCount = 0, edgeCount = 0;
+      const addLine = (coords) => {
+        for (let i = 0; i < coords.length - 1; i++) {
+          const [lng1, lat1] = coords[i];
+          const [lng2, lat2] = coords[i+1];
+          addEdge(lat1, lng1, lat2, lng2);
+          edgeCount++;
+        }
+        lineCount++;
+      };
+      for (const f of data.features) {
+        const g = f.geometry;
+        if (!g) continue;
+        if (g.type === 'LineString') addLine(g.coordinates);
+        else if (g.type === 'MultiLineString') {
+          for (const part of g.coordinates) addLine(part);
+        }
+      }
+      // Build spatial index for realistic, fast snapping
+      buildGridIndex();
+      return { lineCount, edgeCount, nodeCount: nodeKeys.length };
+    }
+
+    // Helper: build arrow HTML (SVG) and rotate via wrapper
+    function makeArrowHtml(rotationDeg, color = '#ff4444') {
+      return `\
+<div class="arrow-wrap" style="transform: rotate(${rotationDeg}deg)">\
+  <svg viewBox="0 0 24 24" class="arrow-svg" aria-hidden="true">\
+    <path class="arrow-body" d="M12 2 L21 22 L12 17 L3 22 Z" fill="${color}"/>\
+  </svg>\
+</div>`;
+    }
+
+    // Canvas-based renderer for optimized simulation when many trains/zoomed out
+    const USE_CANVAS_TRAINS = true; // auto-switch to canvas rendering
+    const trainsCanvas = document.getElementById('trainsCanvas');
+    const ctx = trainsCanvas.getContext ? trainsCanvas.getContext('2d') : null;
+    function resizeCanvas() {
+      if (!trainsCanvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = map.getContainer().getBoundingClientRect();
+      trainsCanvas.width = Math.round(rect.width * dpr);
+      trainsCanvas.height = Math.round(rect.height * dpr);
+      trainsCanvas.style.width = `${rect.width}px`;
+      trainsCanvas.style.height = `${rect.height}px`;
+      if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function drawArrow(ctx, x, y, rotDeg, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotDeg * Math.PI / 180);
+      ctx.fillStyle = color || '#ff4444';
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 0.5;
+      // Triangle similar to SVG: tip up
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(8, 9);
+      ctx.lineTo(0, 4);
+      ctx.lineTo(-8, 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    let needsRepaint = true;
+    function requestRepaint() { needsRepaint = true; }
+    function renderTrainsCanvas(routes, positions, visible) {
+      if (!USE_CANVAS_TRAINS || !ctx) return;
+      if (!visible) { if (ctx) { ctx.clearRect(0,0,trainsCanvas.width, trainsCanvas.height);} return; }
+      if (!needsRepaint) return;
+      needsRepaint = false;
+      const rect = map.getContainer().getBoundingClientRect();
+      ctx.clearRect(0,0,rect.width, rect.height);
+      const bounds = map.getBounds();
+      const pad = 0.5; // degrees padding
+      const minLat = bounds.getSouth() - pad, maxLat = bounds.getNorth() + pad;
+      const minLng = bounds.getWest() - pad, maxLng = bounds.getEast() + pad;
+      positions.forEach((val, id) => {
+        const p = val.pos; const rot = val.rotation || 0;
+        if (!p) return;
+        const lat = p[0], lng = p[1];
+        if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) return; // offscreen cull
+        const pt = map.latLngToContainerPoint([lat, lng]);
+        drawArrow(ctx, pt.x, pt.y, rot, '#ff4444');
+      });
+    }
+    function hookCanvasToMap() {
+      if (!USE_CANVAS_TRAINS || !trainsCanvas) return;
+      resizeCanvas();
+      const onMove = () => { requestRepaint(); };
+      map.on('move zoom zoomend viewreset resize', () => { resizeCanvas(); onMove(); });
+      // Initial paint
+      requestRepaint();
+    }
+
+    // Polyline-based realtime simulation from canonical Mapultra_optimized_trains.json
+    function startSampleRoutesRealtime(file = 'Mapultra_optimized_trains.json') {
+      return fetch(file)
+        .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}: ${r.statusText}`))
+        .then(t => {
+          console.log(`Loaded ${file}, size: ${t.length} chars`);
+          return parseJsonLoose(t);
+        })
+        .then(json => {
+          if (!json) throw new Error('JSON parsing returned null');
+          console.log('Parsed JSON structure:', Object.keys(json));
+          
+          // Handle different JSON structures
+          let trains = [];
+          if (Array.isArray(json?.trains)) {
+            trains = json.trains;
+          } else if (Array.isArray(json)) {
+            trains = json;
+          } else if (json?.data && Array.isArray(json.data)) {
+            trains = json.data;
+          } else {
+            // Try to find any array property
+            for (const [key, value] of Object.entries(json)) {
+              if (Array.isArray(value) && value.length > 0) {
+                trains = value;
+                console.log(`Using array from key: ${key}`);
+                break;
+              }
+            }
+          }
+          
+          if (!trains.length) {
+            throw new Error(`No trains array found in JSON. Available keys: ${Object.keys(json || {}).join(', ')}`);
+          }
+          console.log(`Found ${trains.length} trains in dataset`);
+          sampleSimRoutes = [];
+          const sampleLimit = SimConfig.TRAIN_SAMPLE_LIMIT; // Fewer for lite mode
+          let added = 0;
+          for (const tr of trains) {
+            if (added >= sampleLimit) break;
+            const id = String(tr.train_number ?? tr.id ?? tr.trainName ?? Math.random().toString(36).slice(2));
+            const name = String(tr.train_name ?? tr.name ?? id);
+            // Build polyline: prefer route_coordinates, else from stations
+            let coords = [];
+            if (Array.isArray(tr.route_coordinates) && tr.route_coordinates.length >= 2) {
+              coords = tr.route_coordinates.map(toLatLngPair).filter(Boolean);
+            }
+            if (coords.length < 2 && Array.isArray(tr.stations)) {
+              coords = tr.stations
+                .map(s => [Number(s.lat), Number(s.lon)])
+                .filter(([la, ln]) => isFinite(la) && isFinite(ln));
+            }
+            if (coords.length < 2) {
+              console.warn(`Skipping train ${id}: insufficient route coordinates`);
+              continue;
+            }
+            // Simplify route to reduce per-frame work (km tolerance)
+            if (SimConfig.ROUTE_SIMPLIFY_KM > 0 && coords.length > 5) {
+              coords = simplifyPolylineKm(coords, SimConfig.ROUTE_SIMPLIFY_KM);
+            }
+            const { cum, total } = computeCumulativeKm(coords);
+            // Determine timing - be more flexible with time parsing
+            let t0 = parseHMSToSec(tr.departure);
+            let t1 = parseHMSToSec(tr.arrival);
+            if (t0 == null || t1 == null) {
+              const st = Array.isArray(tr.stations) ? tr.stations : [];
+              const s0 = st.find(s => parseHMSToSec(s.departure) != null);
+              const s1 = [...st].reverse().find(s => parseHMSToSec(s.arrival) != null);
+              t0 = t0 ?? (s0 ? parseHMSToSec(s0.departure) : null);
+              t1 = t1 ?? (s1 ? parseHMSToSec(s1.arrival) : null);
+            }
+            // If still no times, use default 24-hour cycle for demo
+            if (t0 == null || t1 == null) {
+              console.warn(`Train ${id}: using default times (no departure/arrival found)`);
+              t0 = Math.random() * 86400; // Random start time in 24h
+              t1 = t0 + (3600 + Math.random() * 7200); // 1-3 hour journey
+            }
+            if (t1 <= t0) t1 += 86400; // unwrap midnight
+            sampleSimRoutes.push({ id, name, coords, cum, totalKm: total, t0, t1 });
+            added++;
+            if (added <= 5) { // Log first few trains only
+              console.log(`Added train ${id} (${name}) with ${coords.length} route points, ${total.toFixed(1)}km, ${parseFloat((t1-t0)/3600).toFixed(1)}h duration`);
+            }
+          }
+          if (!sampleSimRoutes.length) {
+            console.warn('No valid train routes found in Mapsample_train_routes.json');
+            setStatus('No valid train routes found');
+            return;
+          }
+          console.log(`Starting optimized simulation with ${sampleSimRoutes.length} trains`);
+          let tickCount = 0;
+          let frameCount = 0;
+          let lastFPSTime = performance.now();
+          const speedMultiplier = 1.5; // Balanced speed for optimal performance
+          
+          // Optimized performance monitoring
+          function updatePerformance(activeTrains) {
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFPSTime >= 1500) { // Less frequent updates for better performance
+              const fps = Math.round((frameCount * 1000) / (now - lastFPSTime));
+              document.getElementById('fps').textContent = fps;
+              document.getElementById('trainCount').textContent = activeTrains;
+              document.getElementById('fps').style.color = fps >= 40 ? '#4CAF50' : fps >= 25 ? '#FF9800' : '#F44336';
+              
+              // Auto-adjust performance level based on FPS
+              if (fps < 20) {
+                performanceLevel = 'low';
+              } else if (fps < 35) {
+                performanceLevel = 'medium';
+              } else {
+                performanceLevel = 'high';
+              }
+              
+              frameCount = 0;
+              lastFPSTime = now;
+            }
+          }
+          
+          // Google Maps-style adaptive performance system (use global variable)
+          performanceLevel = 'ultra'; // reset at start
+          let skipFrames = 0;
+          let smoothingEnabled = true;
+          
+          const tick = () => {
+            // Zoom-aware performance adaptation for ultra-smooth zooming
+            if (isZooming) {
+              // Reduce train animation frequency during zoom for smoother map movement
+              if (skipFrames++ % 3 !== 0) return;
+            } else {
+              // Normal performance adaptation when not zooming
+              if (performanceLevel === 'medium' && skipFrames++ % 2 === 1) return;
+              if (performanceLevel === 'low' && skipFrames++ % 3 !== 0) return;
+              // Ultra mode: no frame skipping for maximum smoothness when not zooming
+            }
+            
+            const baseNow = nowSecOfDay() * speedMultiplier; // Accelerated time for faster movement
+            const showByZoom = map.getZoom() >= markerVisibilityZoom;
+            const offsets = [-86400, 0, 86400];
+            let activeTrains = 0;
+            
+            for (const tr of sampleSimRoutes) {
+              let pos = null;
+              for (const off of offsets) {
+                const tNow = baseNow + off;
+                if (tNow < tr.t0 || tNow > tr.t1) continue;
+                const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
+                const targetKm = r * tr.totalKm;
+                pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
+                // Strict snapping at configured cadence to reduce CPU
+                if (pos) {
+                  if (SimConfig.SNAP_STRICT_EVERY_N <= 1 || (tickCount % SimConfig.SNAP_STRICT_EVERY_N === 0)) {
+                    const snapped = snapToTrackStrict(pos[0], pos[1]);
+                    pos = [snapped.lat, snapped.lng];
+                  }
+                }
+                break;
+              }
+              if (!pos) continue;
+              activeTrains++;
+              const id = String(tr.id);
+              try {
+                realtimeSeenAt.set(id, Date.now());
+                let m = realtimeMarkerById.get(id);
+                // Google Maps-style smooth interpolation with rotation
+                const trackPos = snapToTrackStrict(pos[0], pos[1]);
+                const targetPos = [trackPos.lat, trackPos.lng];
+                
+                // Google Maps-style smooth movement with momentum
+                let rotation = 0;
+                let finalPos = targetPos;
+                if (trainPositions.has(id)) {
+                  const prevData = trainPositions.get(id);
+                  const prevPos = prevData.pos || [prevData[0], prevData[1]]; // Support both formats
+                  
+                  // Smooth position interpolation
+                  finalPos = [
+                    prevPos[0] + (targetPos[0] - prevPos[0]) * interpolationFactor,
+                    prevPos[1] + (targetPos[1] - prevPos[1]) * interpolationFactor
+                  ];
+                  
+                  // Calculate smooth rotation with momentum damping
+                  const dx = targetPos[1] - prevPos[1];
+                  const dy = targetPos[0] - prevPos[0];
+                  if (Math.abs(dx) > 0.0001 || Math.abs(dy) > 0.0001) {
+                    const targetRotation = Math.atan2(dx, dy) * (180 / Math.PI);
+                    const prevRotation = prevData.rotation || 0;
+                    
+                    // Smooth rotation with Google Maps-style momentum
+                    let rotDiff = targetRotation - prevRotation;
+                    if (rotDiff > 180) rotDiff -= 360;
+                    if (rotDiff < -180) rotDiff += 360;
+                    
+                    rotation = prevRotation + (rotDiff * 0.4); // Smooth rotation factor
+                  } else {
+                    rotation = prevData.rotation || 0;
+                  }
+                }
+                trainPositions.set(id, { pos: finalPos, rotation });
+                
+                if (!m && !USE_CANVAS_TRAINS) {
+                  const arrowHtml = makeArrowHtml(rotation);
+                  const icon = L.divIcon({ className: 'train-icon', html: arrowHtml, iconSize: [22,22] });
+                  m = getPooledMarker(finalPos, icon);
+                  m.bindTooltip(id, { permanent: false, direction: 'top', offset: [0, -8], className: 'train-label' });
+                  m.setOpacity(showByZoom ? 1 : 0);
+                  m.addTo(realtimeLayer);
+                  // cache arrow wrapper for fast rotation updates
+                  try { const el = m.getElement(); m._arrowWrap = el ? el.querySelector('.arrow-wrap') : null; } catch {}
+                  realtimeMarkerById.set(id, m);
+                } else if (!USE_CANVAS_TRAINS && m) {
+                  // Smooth position and rotation updates
+                  m.setLatLng(finalPos);
+                  // Update rotation by mutating existing DOM instead of recreating icon
+                  let wrap = m._arrowWrap;
+                  if (!wrap) { try { const el = m.getElement(); wrap = m._arrowWrap = el ? el.querySelector('.arrow-wrap') : null; } catch {} }
+                  if (wrap) {
+                    wrap.style.transform = `rotate(${rotation}deg)`;
+                  } else {
+                    // fallback (rare): reset icon
+                    const arrowHtml = makeArrowHtml(rotation);
+                    m.setIcon(L.divIcon({ className: 'train-icon', html: arrowHtml, iconSize: [22,22] }));
+                  }
+                  m.setOpacity(showByZoom ? 1 : 0);
+                }
+                // Canvas repaint if active
+                if (USE_CANVAS_TRAINS) requestRepaint();
+                if (showTrainMarkers && !map.hasLayer(realtimeLayer)) map.addLayer(realtimeLayer);
+                const tState = scheduledTrains.get(id);
+                if (tState && tState.marker) {
+                  tState.externalControlled = true;
+                  tState.externalUntil = Date.now() + 30000;
+                  // Force track-aligned updates for scheduled trains
+                  if (showTrainMarkers) {
+                    const alignedPos = snapToTrackStrict(pos[0], pos[1]);
+                    tState.marker.setLatLng([alignedPos.lat, alignedPos.lng]);
+                    setMarkerVisible(tState.marker, showByZoom);
+                  }
+                }
+              } catch (error) {
+                console.warn(`Error updating train ${id}:`, error);
+              }
+            }
+            
+            // FORCE all markers to stay on tracks (verification sweep)
+            const verifyEvery = SimConfig.LITE_MODE ? 20 : 10;
+            if (tickCount % verifyEvery === 0) { // periodic verification sweep
+              realtimeMarkerById.forEach((marker, id) => {
+                const currentPos = marker.getLatLng();
+                const aligned = snapToTrackStrict(currentPos.lat, currentPos.lng);
+                const dist = haversineKm(currentPos.lat, currentPos.lng, aligned.lat, aligned.lng);
+                if (dist > 0.1) { // If more than 100m off track, force realign
+                  marker.setLatLng([aligned.lat, aligned.lng]);
+                }
+              });
+            }
+            
+            // Update performance metrics and debug output
+            updatePerformance(activeTrains);
+            tickCount++;
+            if (tickCount % 60 === 0) { // Much less frequent logging for maximum performance
+              console.log(`${activeTrains}/${sampleSimRoutes.length} trains active`);
+              // Efficient memory cleanup
+              if (realtimeMarkerById.size > 150) {
+                const now = Date.now();
+                for (const [id, lastSeen] of realtimeSeenAt.entries()) {
+                  if (now - lastSeen > 90000) { // Longer retention for better performance
+                    const marker = realtimeMarkerById.get(id);
+                    if (marker) {
+                      returnMarkerToPool(marker);
+                      realtimeMarkerById.delete(id);
+                    }
+                    realtimeSeenAt.delete(id);
+                  }
+                }
+              }
+            }
+          };
+          
+          // Start the optimized simulation loop
+          function startSimulation() {
+            // Render canvas after updating positions
+            try { renderTrainsCanvas(sampleSimRoutes, trainPositions, map.getZoom() >= markerVisibilityZoom); } catch {}
+            tick();
+            // Continue the loop at variable speed based on performance
+            const now = performance.now();
+            const frameDuration = 1000 / SimConfig.TARGET_FPS; // target e.g., 40 FPS
+            const drift = performance.now() - now;
+            setTimeout(startSimulation, Math.max(0, frameDuration - drift));
+          }
+          startSimulation();
+          // Signal success to caller
+          return true;
+        })
+        .catch(err => {
+          console.error('Error loading or parsing train routes:', err);
+          // Re-throw so caller can try fallback
+          throw err;
+        });
+    }
+
+    // --- Bootstrapping: load railway graph first, then trains with fallbacks ---
+    async function loadRailways() {
+      try {
+        updateLoadingStep(0, 'Loading Railway Network...', 'Fetching MapRailways_indian.geojson (~2MB)');
+        const res = await fetch('MapRailways_indian.geojson');
+        if (!res.ok) throw new Error(`Railways file fetch failed: HTTP ${res.status}`);
+        const geo = await res.json();
+        updateLoadingStep(1, 'Building Railway Graph...', 'Processing railway nodes and connections');
+        // Draw light-weight rail layer for context
+        if (railwayLayer) { try { map.removeLayer(railwayLayer); } catch {} }
+        railwayLayer = L.geoJSON(geo, { style: { color: '#1e88e5', weight: 1, opacity: 0.6 } }).addTo(map);
+        const stats = buildGraphFromGeoJSON(geo);
+        console.log(`Railway graph built: ${stats.nodeCount} nodes, ${stats.edgeCount} edges across ${stats.lineCount} lines`);
+      } catch (e) {
+        console.warn('Railway network load failed; trains will still animate but snapping may be imprecise:', e);
+        // Keep going even if railways fail, but surface the error in UI
+      }
+    }
+
+    async function loadTrainsWithFallback() {
+      const candidates = [
+        // Favor smallest payloads when in lite mode
+        ...(SimConfig.LITE_MODE ? ['Mapminimal_trains.json','Mapultra_optimized_trains.json','Mapoptimized_trains.json'] : ['Mapultra_optimized_trains.json','Mapoptimized_trains.json','Mapminimal_trains.json'])
+      ];
+      let lastErr = null;
+      for (const file of candidates) {
+        try {
+          updateLoadingStep(3, 'Loading Train Schedules...', `Fetching ${file}`);
+          await startSampleRoutesRealtime(file);
+          return true; // success
+        } catch (e) {
+          lastErr = e;
+          console.warn(`Failed to load ${file}, trying next...`, e);
+        }
+      }
+      // If all failed, surface a user-facing error
+      showLoadingError(lastErr ? String(lastErr) : 'No train data file available');
+      throw lastErr || new Error('No train data file available');
+    }
+
+    // Optional: minimal station loader for index resolution (non-blocking)
+    async function loadStationsMinimal() {
+      try {
+        updateLoadingStep(2, 'Loading Station Data...', 'Fetching Mapstation.geojson or Mapstations.json');
+        const tryUrls = ['Mapstation.geojson','Maprailway_station.geojson','Mapstations.json'];
+        for (const u of tryUrls) {
+          try {
+            const res = await fetch(u);
+            if (!res.ok) continue;
+            if (u.endsWith('.json')) {
+              const text = await res.text();
+              const json = parseJsonLoose(text);
+              const arr = Array.isArray(json) ? json : (json && Array.isArray(json.data) ? json.data : []);
+              const feats = (arr || []).map(o => ({ type:'Feature', geometry:{ type:'Point', coordinates:[Number(o.lon ?? o.lng), Number(o.lat)] }, properties:{ name: o.name || o.station_name || o['Station Name'] || '' } }));
+              populateStationIndex(feats);
+              updateLoadingStep(2, 'Stations Loaded', `${feats.length} stations indexed`);
+              return;
+            } else {
+              const geo = await res.json();
+              const pts = Array.isArray(geo.features) ? geo.features.filter(f => f.geometry && f.geometry.type==='Point') : [];
+              populateStationIndex(pts);
+              updateLoadingStep(2, 'Stations Loaded', `${pts.length} stations indexed`);
+              return;
+            }
+          } catch {}
+        }
+      } catch {}
+    }
+
+    (async function bootstrap() {
+      try {
+        await loadRailways();
+        // Kick off stations load but don't block trains
+        loadStationsMinimal().catch(() => {});
+        await loadTrainsWithFallback();
+        hookCanvasToMap();
+        updateLoadingStep(5, 'Ready!', 'Railway system fully operational');
+        hideLoadingOverlay();
+      } catch (e) {
+        console.error('Bootstrap error:', e);
+        showLoadingError(String(e));
+      }
+    })();
+    
+    // Global object for train positions (for realtime updates)
+  const trainPositions = new Map(); // id -> { lat, lng, ... }
+    const realtimeSeenAt = new Map(); // id -> timestamp
+  const interpolationFactor = 0.4; // Smoothness factor for position interpolation
+  // Global performance state shared across loops
+  let performanceLevel = 'ultra'; // ultra, high, medium, low
+  // Global sample routes used by both the canvas renderer and the DOM update loop
+  let sampleSimRoutes = [];
+    
+    // Main simulation loop - optimized for performance
+    let mainSimulationActive = true;
+    function mainSimulationTick() {
+      if (!mainSimulationActive) return;
+      const now = performance.now();
+      // Wait until routes are loaded
+      if (!Array.isArray(sampleSimRoutes) || sampleSimRoutes.length === 0) {
+        return requestAnimationFrame(mainSimulationTick);
+      }
+      // Skip frames intelligently based on performance level
+      if (performanceLevel === 'low') {
+        if (Math.random() < 0.7) return; // 30% of frames
+      } else if (performanceLevel === 'medium') {
+        if (Math.random() < 0.3) return; // 70% of frames
+      }
+      // Regular update for high/ultra performance
+      for (const tr of sampleSimRoutes) {
+        const id = String(tr.id);
+        const m = realtimeMarkerById.get(id);
+        if (!m) continue;
+        const pos = trainPositions.get(id);
+        if (!pos) continue;
+        // Update position only (no rotation for simplicity)
+        m.setLatLng(pos.pos);
+      }
+      requestAnimationFrame(mainSimulationTick);
+    }
+    mainSimulationTick();
+  </script>
+</body>
+</html>
