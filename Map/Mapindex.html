@@ -229,6 +229,32 @@
   </div>
 
   <script>
+    // Embedded minimal train dataset (last-resort fallback for hosting environments that cannot serve LFS JSON)
+    window.EMBEDDED_MINI_TRAIN_DATA = {
+      trains: [
+        {
+          id: "DLI-JP-01",
+          train_name: "Demo Express",
+          route_coordinates: [
+            [77.2090, 28.6139], // Delhi
+            [76.6062, 28.1987], // Rewari
+            [75.7873, 26.9124]  // Jaipur
+          ],
+          departure: "08:00",
+          arrival: "12:00"
+        },
+        {
+          id: "JP-AJM-02",
+          train_name: "Demo Passenger",
+          route_coordinates: [
+            [75.7873, 26.9124], // Jaipur
+            [74.6400, 26.4499]  // Ajmer approx
+          ],
+          departure: "09:30",
+          arrival: "11:00"
+        }
+      ]
+    };
     // Initialize map with smooth zoom options - focused on India
     const map = L.map('map', {
       zoomAnimation: true,
@@ -1357,6 +1383,48 @@
         });
     }
 
+    function startSampleRoutesFromEmbedded() {
+      try {
+        const json = window.EMBEDDED_MINI_TRAIN_DATA;
+        if (!json) throw new Error('No embedded dataset');
+        let trains = Array.isArray(json?.trains) ? json.trains : (Array.isArray(json) ? json : []);
+        if (!trains.length) throw new Error('Embedded dataset empty');
+        sampleSimRoutes = [];
+        const sampleLimit = 25;
+        let added = 0;
+        for (const tr of trains) {
+          if (added >= sampleLimit) break;
+          const id = String(tr.train_number ?? tr.id ?? tr.trainName ?? Math.random().toString(36).slice(2));
+          const name = String(tr.train_name ?? tr.name ?? id);
+          let coords = [];
+          if (Array.isArray(tr.route_coordinates) && tr.route_coordinates.length >= 2) {
+            coords = tr.route_coordinates.map(toLatLngPair).filter(Boolean);
+          }
+          if (coords.length < 2 && Array.isArray(tr.stations)) {
+            coords = tr.stations.map(s => [Number(s.lat), Number(s.lon)]).filter(([la, ln]) => isFinite(la) && isFinite(ln));
+          }
+          if (coords.length < 2) continue;
+          const { cum, total } = computeCumulativeKm(coords);
+          let t0 = parseHMSToSec(tr.departure) ?? (8 * 3600);
+          let t1 = parseHMSToSec(tr.arrival) ?? (t0 + 7200);
+          if (t1 <= t0) t1 = t0 + 3600;
+          sampleSimRoutes.push({ id, name, coords, cum, totalKm: total, t0, t1 });
+          added++;
+        }
+        console.log(`Started embedded demo with ${sampleSimRoutes.length} trains`);
+        // Kick simulation
+        (function startSimulation() {
+          try { renderTrainsCanvas(sampleSimRoutes, trainPositions, map.getZoom() >= markerVisibilityZoom); } catch {}
+          // Minimal tick to keep markers updated if any created later
+          setTimeout(startSimulation, 1000 / SimConfig.TARGET_FPS);
+        })();
+        return true;
+      } catch (e) {
+        console.error('Embedded fallback failed:', e);
+        return false;
+      }
+    }
+
     // --- Bootstrapping: load railway graph first, then trains with fallbacks ---
     async function loadRailways() {
       try {
@@ -1391,7 +1459,13 @@
           console.warn(`Failed to load ${file}, trying next...`, e);
         }
       }
-      // If all failed, surface a user-facing error
+      // If all failed, try embedded minimal dataset before surfacing error
+      const ok = startSampleRoutesFromEmbedded();
+      if (ok) {
+        setStatus('Running in demo mode (embedded data).');
+        return true;
+      }
+      // If even embedded fails, surface a user-facing error
       showLoadingError(lastErr ? String(lastErr) : 'No train data file available');
       throw lastErr || new Error('No train data file available');
     }
