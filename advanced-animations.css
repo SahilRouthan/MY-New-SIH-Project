@@ -1,0 +1,498 @@
+/* Advanced Animations and Interactions */
+
+/* Particle Background Animation */
+.app-container::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 107, 53, 0.2) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(26, 115, 232, 0.2) 0%, transparent 50%);
+    animation: particleFloat 20s ease-in-out infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+
+@keyframes particleFloat {
+    0%, 100% { 
+        transform: translate(0, 0) rotate(0deg);
+        opacity: 0.3;
+    }
+    33% { 
+        transform: translate(20px, -20px) rotate(120deg);
+        opacity: 0.5;
+    }
+    66% { 
+        transform: translate(-20px, 10px) rotate(240deg);
+        opacity: 0.3;
+    }
+}
+
+/* Advanced Loading Animation */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(26, 115, 232, 0.9), rgba(118, 75, 162, 0.9));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.5s ease;
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top: 4px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+.loading-text {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.loading-subtext {
+    font-size: var(--font-size-sm);
+    opacity: 0.8;
+}
+
+/* Train Movement Animation */
+@keyframes trainMove {
+    0% {
+        transform: translateX(-100px);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(calc(100vw + 100px));
+        opacity: 0;
+    }
+}
+
+.train-animation {
+    position: fixed;
+    bottom: 20px;
+    left: -100px;
+    width: 80px;
+    height: 20px;
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+    border-radius: 10px;
+    animation: trainMove 15s linear infinite;
+    z-index: 1;
+    box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3);
+}
+
+.train-animation::before {
+    content: '🚄';
+    position: absolute;
+    left: -10px;
+    top: -5px;
+    font-size: 24px;
+    animation: bounce 2s ease-in-out infinite;
+}
+
+/* Advanced Card Hover Effects */
+.dashboard-card,
+.kpi-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-card::after,
+.kpi-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        45deg,
+        transparent,
+        rgba(255, 255, 255, 0.1),
+        transparent
+    );
+    transform: rotate(45deg);
+    transition: all 0.8s ease;
+    opacity: 0;
+}
+
+.dashboard-card:hover::after,
+.kpi-card:hover::after {
+    animation: shimmer 1.5s ease-in-out;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+        opacity: 0;
+    }
+}
+
+/* Advanced Button Interactions */
+.btn {
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+}
+
+.btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn:active::after {
+    width: 300px;
+    height: 300px;
+}
+
+/* Floating Action Button */
+.fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--secondary-color), #e55a2b);
+    border-radius: 50%;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(255, 107, 53, 0.4);
+    transition: all 0.3s ease;
+    z-index: 1000;
+    animation: fabPulse 3s ease-in-out infinite;
+}
+
+.fab:hover {
+    transform: scale(1.1) translateY(-2px);
+    box-shadow: 0 8px 30px rgba(255, 107, 53, 0.6);
+}
+
+@keyframes fabPulse {
+    0%, 100% {
+        box-shadow: 0 4px 20px rgba(255, 107, 53, 0.4);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(255, 107, 53, 0.6), 0 0 0 10px rgba(255, 107, 53, 0.1);
+    }
+}
+
+/* Status Indicator Animations */
+.status-indicator {
+    position: relative;
+    display: inline-block;
+}
+
+.status-indicator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: statusPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.status-indicator.active::before {
+    background: rgba(40, 167, 69, 0.75);
+}
+
+.status-indicator.warning::before {
+    background: rgba(255, 193, 7, 0.75);
+}
+
+.status-indicator.error::before {
+    background: rgba(220, 53, 69, 0.75);
+}
+
+@keyframes statusPing {
+    75%, 100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+    }
+}
+
+/* Advanced Table Animations */
+.trains-table tbody tr {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.trains-table tbody tr::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background: var(--primary-color);
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+    transform-origin: bottom;
+}
+
+.trains-table tbody tr:hover::before {
+    transform: scaleY(1);
+}
+
+.trains-table tbody tr:hover {
+    background: linear-gradient(90deg, rgba(26, 115, 232, 0.05), transparent);
+    transform: translateX(8px);
+}
+
+/* Map Marker Animations */
+.train-marker-container {
+    position: relative;
+}
+
+.train-marker-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: markerPulse 2s infinite;
+}
+
+@keyframes markerPulse {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(2);
+        opacity: 0;
+    }
+}
+
+/* Navigation Enhancement */
+.nav-item {
+    position: relative;
+    overflow: hidden;
+}
+
+.nav-item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.nav-item:hover::after {
+    left: 100%;
+}
+
+/* Advanced Form Interactions */
+.form-control {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(26, 115, 232, 0.2);
+}
+
+.form-group {
+    position: relative;
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+    position: absolute;
+    top: 50%;
+    left: var(--spacing-md);
+    transform: translateY(-50%);
+    background: white;
+    padding: 0 var(--spacing-xs);
+    color: var(--gray-500);
+    transition: all 0.3s ease;
+    pointer-events: none;
+}
+
+.form-group .form-control:focus + label,
+.form-group .form-control:not(:placeholder-shown) + label {
+    top: 0;
+    font-size: var(--font-size-xs);
+    color: var(--primary-color);
+}
+
+/* Performance Metrics Animation */
+.metric-value {
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-value::before {
+    content: attr(data-value);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(26, 115, 232, 0.1), transparent);
+    animation: countUp 2s ease-out;
+}
+
+@keyframes countUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Advanced Chart Animations */
+.chart-container {
+    position: relative;
+    opacity: 0;
+    animation: chartFadeIn 1s ease-out forwards;
+}
+
+@keyframes chartFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Mobile Touch Interactions */
+@media (hover: none) and (pointer: coarse) {
+    .btn:active {
+        transform: scale(0.95);
+    }
+    
+    .nav-item:active {
+        background: var(--primary-light);
+    }
+    
+    .dashboard-card:active {
+        transform: scale(0.98);
+    }
+}
+
+/* Accessibility Enhancements */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: var(--primary-color);
+    color: white;
+    padding: 8px;
+    text-decoration: none;
+    border-radius: 4px;
+    z-index: 10000;
+    transition: top 0.3s ease;
+}
+
+.skip-link:focus {
+    top: 6px;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    :root {
+        --primary-color: #0000ff;
+        --secondary-color: #ff0000;
+        --success-color: #008000;
+        --warning-color: #ffff00;
+        --danger-color: #ff0000;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --white: #1a1a1a;
+        --gray-50: #2d2d2d;
+        --gray-100: #3a3a3a;
+        --gray-200: #4a4a4a;
+        --gray-300: #5a5a5a;
+        --gray-700: #e0e0e0;
+        --gray-800: #f0f0f0;
+        --gray-900: #ffffff;
+    }
+    
+    .app-container {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+}

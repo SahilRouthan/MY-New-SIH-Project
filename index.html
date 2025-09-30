@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Railway Traffic Management System | Ministry of Railways, Government of India</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="advanced-animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMDA0ODg1Ii8+CjxwYXRoIGQ9Ik04IDE2SDE2VjI0SDhWMTZaIiBmaWxsPSIjRkZGRkZGIi8+CjxwYXRoIGQ9Ik0xNiA4SDI0VjE2SDE2VjhaIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPgo=">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Government Header Bar -->
+        <div class="gov-header">
+            <div class="gov-header-content">
+                <div class="gov-emblem">
+                    <img src="indian_railways_logo.png" alt="Indian Railways Logo" class="gov-logo">
+                    <div class="gov-text">
+                        <span class="gov-title">Government of India</span>
+                        <span class="gov-ministry">Ministry of Railways</span>
+                    </div>
+                </div>
+                <div class="gov-lang">
+                    <select class="lang-selector">
+                        <option value="en">English</option>
+                        <option value="hi">हिन्दी</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-emblem">
+                        <i class="fas fa-train"></i>
+                    </div>
+                    <div class="logo-content">
+                        <span class="logo-title">Smart Railway Traffic Management System</span>
+                        <span class="logo-subtitle">Intelligent Train Operations Control</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="system-status">
+                    <div class="status-grid">
+                        <div class="status-item operational">
+                            <span class="status-indicator"></span>
+                            <span class="status-label">System Operational</span>
+                        </div>
+                        <div class="status-item alerts">
+                            <span class="status-indicator"></span>
+                            <span class="status-label">3 Active Alerts</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="time-display">
+                    <div class="current-time" id="currentTime"></div>
+                    <div class="date" id="currentDate"></div>
+                </div>
+                <div class="user-info">
+                    <div class="user-details">
+                        <span class="user-name">Controller A. Kumar</span>
+                        <span class="user-role">Senior Traffic Controller</span>
+                        <span class="user-zone">Northern Railway Division</span>
+                    </div>
+                    <div class="user-avatar">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="nav-menu">
+                    <div class="nav-section">
+                        <div class="nav-section-title">Control Center</div>
+                        <div class="nav-item active" data-view="dashboard">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Operations Dashboard</span>
+                        </div>
+                        <div class="nav-item" data-view="network">
+                            <i class="fas fa-route"></i>
+                            <span>Network Overview</span>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Train Operations</div>
+                        <div class="nav-item" data-view="trains">
+                            <i class="fas fa-train"></i>
+                            <span>Train Management</span>
+                        </div>
+                        <div class="nav-item" data-view="schedule">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>Schedule Planning</span>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">Analysis & Reports</div>
+                        <div class="nav-item" data-view="analytics">
+                            <i class="fas fa-chart-line"></i>
+                            <span>Performance Analytics</span>
+                        </div>
+                        <div class="nav-item" data-view="simulation">
+                            <i class="fas fa-play-circle"></i>
+                            <span>Scenario Simulation</span>
+                        </div>
+                    </div>
+                    
+                    <div class="nav-section">
+                        <div class="nav-section-title">System Monitoring</div>
+                        <div class="nav-item alert-nav" data-view="alerts">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>System Alerts</span>
+                            <span class="alert-badge">3</span>
+                        </div>
+                    </div>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Dashboard View -->
+                <div class="view dashboard-view active" id="dashboard">
+                    <div class="view-header">
+                        <div class="page-title">
+                            <h1>Operations Control Dashboard</h1>
+                            <p class="page-subtitle">Real-time monitoring and control of railway traffic operations</p>
+                        </div>
+                        <div class="view-actions">
+                            <button class="btn btn-secondary" id="exportDashboardPdf" title="Export dashboard as PDF">
+                                <i class="fas fa-file-pdf"></i>
+                                Export PDF
+                            </button>
+                            <button class="btn btn-outline" id="exportDashboardCsv" title="Export dashboard as CSV">
+                                <i class="fas fa-file-csv"></i>
+                                Export CSV
+                            </button>
+                            <button class="btn btn-primary">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh Data
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-icon">
+                                <i class="fas fa-train"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-value">247</div>
+                                <div class="kpi-label">Active Trains</div>
+                                <div class="kpi-change positive">+12 from yesterday</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-value">92.3%</div>
+                                <div class="kpi-label">On-Time Performance</div>
+                                <div class="kpi-change positive">+2.1% from last week</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon">
+                                <i class="fas fa-route"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-value">156</div>
+                                <div class="kpi-label">Track Sections</div>
+                                <div class="kpi-change">3 under maintenance</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="kpi-content">
+                                <div class="kpi-value">3</div>
+                                <div class="kpi-label">Active Alerts</div>
+                                <div class="kpi-change negative">2 critical</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Grid -->
+                    <div class="dashboard-grid">
+                        <!-- Live Network Status -->
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3>Live Network Status</h3>
+                                <div class="card-actions">
+                                    <button class="btn-icon">
+                                        <i class="fas fa-expand"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-content">
+                                <div class="network-overview">
+                                    <div class="network-item">
+                                        <span class="network-status green"></span>
+                                        <span>Delhi Junction</span>
+                                        <span class="network-count">15 trains</span>
+                                    </div>
+                                    <div class="network-item">
+                                        <span class="network-status yellow"></span>
+                                        <span>Gurgaon</span>
+                                        <span class="network-count">8 trains</span>
+                                    </div>
+                                    <div class="network-item">
+                                        <span class="network-status green"></span>
+                                        <span>Jaipur Junction</span>
+                                        <span class="network-count">12 trains</span>
+                                    </div>
+                                    <div class="network-item">
+                                        <span class="network-status red"></span>
+                                        <span>Kota Junction</span>
+                                        <span class="network-count">6 trains</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Decisions -->
+                        <div class="dashboard-card">
+                            <div class="card-header">
+                                <h3>AI Recommendations</h3>
+                            </div>
+                            <div class="card-content">
+                                <div class="recommendation-list">
+                                    <div class="recommendation-item">
+                                        <div class="rec-icon">
+                                            <i class="fas fa-route"></i>
+                                        </div>
+                                        <div class="rec-content">
+                                            <div class="rec-title">Reroute Train 12001</div>
+                                            <div class="rec-desc">Avoid congestion at Gurgaon Junction</div>
+                                            <div class="rec-time">2 minutes ago</div>
+                                        </div>
+                                        <div class="rec-actions">
+                                            <button class="btn btn-sm btn-success">Accept</button>
+                                            <button class="btn btn-sm btn-outline">Dismiss</button>
+                                        </div>
+                                    </div>
+                                    <div class="recommendation-item">
+                                        <div class="rec-icon">
+                                            <i class="fas fa-clock"></i>
+                                        </div>
+                                        <div class="rec-content">
+                                            <div class="rec-title">Delay Train 12049</div>
+                                            <div class="rec-desc">Priority to Express 12005</div>
+                                            <div class="rec-time">5 minutes ago</div>
+                                        </div>
+                                        <div class="rec-actions">
+                                            <button class="btn btn-sm btn-success">Accept</button>
+                                            <button class="btn btn-sm btn-outline">Dismiss</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Performance Chart -->
+                        <div class="dashboard-card chart-card">
+                            <div class="card-header">
+                                <h3>Network Performance</h3>
+                                <div class="chart-controls">
+                                    <select class="form-control">
+                                        <option>Last 24 Hours</option>
+                                        <option>Last Week</option>
+                                        <option>Last Month</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-content">
+                                <canvas id="performanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Network Map View -->
+                <div class="view network-view" id="network">
+                    <div class="view-header">
+                        <h1>Interactive Network Map</h1>
+                        <div class="view-actions">
+                            <div class="map-controls">
+                                <button class="btn btn-outline" id="toggleTrains">
+                                    <i class="fas fa-train"></i>
+                                    Show Trains
+                                </button>
+                                <button class="btn btn-outline" id="toggleStations">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Show Stations
+                                </button>
+                                <button class="btn btn-outline" id="toggleSignals">
+                                    <i class="fas fa-traffic-light"></i>
+                                    Show Signals
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="map-container">
+                        <div id="railwayMap" class="railway-map"></div>
+                        <div class="map-legend">
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #28a745;"></span>
+                                <span>Normal Speed</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #ffc107;"></span>
+                                <span>Reduced Speed</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #dc3545;"></span>
+                                <span>Stopped/Delayed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Train Management View -->
+                <div class="view trains-view" id="trains">
+                    <div class="view-header">
+                        <h1>Train Management</h1>
+                        <div class="view-actions">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" placeholder="Search trains..." id="trainSearch">
+                            </div>
+                            <button class="btn btn-primary">
+                                <i class="fas fa-plus"></i>
+                                Add Train
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Train Summary Cards -->
+                    <div class="train-summary-grid">
+                        <div class="summary-card">
+                            <div class="summary-icon">
+                                <i class="fas fa-train"></i>
+                            </div>
+                            <div class="summary-content">
+                                <div class="summary-value">247</div>
+                                <div class="summary-label">Total Trains</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon active">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="summary-content">
+                                <div class="summary-value">228</div>
+                                <div class="summary-label">On Time</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon delayed">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="summary-content">
+                                <div class="summary-value">15</div>
+                                <div class="summary-label">Delayed</div>
+                            </div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon cancelled">
+                                <i class="fas fa-times-circle"></i>
+                            </div>
+                            <div class="summary-content">
+                                <div class="summary-value">4</div>
+                                <div class="summary-label">Cancelled</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="trains-grid">
+                        <div class="trains-filters">
+                            <h3>
+                                <i class="fas fa-filter"></i>
+                                Filter Trains
+                            </h3>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-info-circle"></i>
+                                    Status
+                                </label>
+                                <select class="form-control">
+                                    <option>All Status</option>
+                                    <option>On Time</option>
+                                    <option>Delayed</option>
+                                    <option>Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-star"></i>
+                                    Priority
+                                </label>
+                                <select class="form-control">
+                                    <option>All Priorities</option>
+                                    <option>Express</option>
+                                    <option>Passenger</option>
+                                    <option>Freight</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-route"></i>
+                                    Route
+                                </label>
+                                <select class="form-control">
+                                    <option>All Routes</option>
+                                    <option>Delhi-Mumbai</option>
+                                    <option>Delhi-Kolkata</option>
+                                    <option>Mumbai-Chennai</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-calendar"></i>
+                                    Date Range
+                                </label>
+                                <select class="form-control">
+                                    <option>Today</option>
+                                    <option>This Week</option>
+                                    <option>This Month</option>
+                                    <option>Custom Range</option>
+                                </select>
+                            </div>
+                            <div class="filter-actions">
+                                <button class="btn btn-primary btn-sm">
+                                    <i class="fas fa-search"></i>
+                                    Apply Filters
+                                </button>
+                                <button class="btn btn-outline btn-sm">
+                                    <i class="fas fa-undo"></i>
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="trains-table-container">
+                            <table class="trains-table">
+                                <thead>
+                                    <tr>
+                                        <th>Train No.</th>
+                                        <th>Name</th>
+                                        <th>Current Location</th>
+                                        <th>Status</th>
+                                        <th>Delay</th>
+                                        <th>Priority</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trainsTableBody">
+                                    <!-- Train rows will be dynamically populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schedule Planning View -->
+                <div class="view schedule-view" id="schedule">
+                    <div class="view-header">
+                        <h1>Schedule Planning</h1>
+                        <div class="view-actions">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" placeholder="Search by train, route..." id="scheduleSearch">
+                            </div>
+                            <button class="btn btn-primary" id="exportSchedule">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="trains-grid">
+                        <div class="trains-filters">
+                            <h3>
+                                <i class="fas fa-filter"></i>
+                                Filters
+                            </h3>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    Origin
+                                </label>
+                                <select class="form-control" id="scheduleOrigin">
+                                    <option value="">All</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-flag-checkered"></i>
+                                    Destination
+                                </label>
+                                <select class="form-control" id="scheduleDestination">
+                                    <option value="">All</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-info-circle"></i>
+                                    Status
+                                </label>
+                                <select class="form-control" id="scheduleStatus">
+                                    <option value="">All</option>
+                                    <option value="Scheduled">Scheduled</option>
+                                    <option value="On Time">On Time</option>
+                                    <option value="Delayed">Delayed</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label>
+                                    <i class="fas fa-calendar"></i>
+                                    Date
+                                </label>
+                                <input type="date" class="form-control" id="scheduleDate">
+                            </div>
+                            <div class="filter-actions">
+                                <button class="btn btn-primary btn-sm" id="applyScheduleFilters">
+                                    <i class="fas fa-search"></i>
+                                    Apply
+                                </button>
+                                <button class="btn btn-outline btn-sm" id="resetScheduleFilters">
+                                    <i class="fas fa-undo"></i>
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="trains-table-container">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <div>
+                                    <span id="scheduleCount">--</span>
+                                </div>
+                                <div>
+                                    <label style="font-size:12px;color:var(--text-muted);margin-right:6px;">Rows</label>
+                                    <select id="schedulePageSize" class="form-control" style="display:inline-block;width:auto;">
+                                        <option>10</option>
+                                        <option selected>25</option>
+                                        <option>50</option>
+                                        <option>100</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <table class="trains-table" id="scheduleTable">
+                                <thead>
+                                    <tr>
+                                        <th>Train No.</th>
+                                        <th>Name</th>
+                                        <th>Origin</th>
+                                        <th>Departure</th>
+                                        <th>Destination</th>
+                                        <th>Arrival</th>
+                                        <th>Days/Date</th>
+                                        <th>Status</th>
+                                        <th>Platform</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduleTableBody">
+                                    <!-- Schedule rows will be populated dynamically -->
+                                </tbody>
+                            </table>
+                            <div id="scheduleEmptyState" style="display:none;padding:24px;text-align:center;color:var(--text-muted);">
+                                <i class="fas fa-calendar-times" style="font-size:22px;opacity:.7;"></i>
+                                <div>No schedules found for the selected filters.</div>
+                            </div>
+                            <div class="pagination" id="schedulePagination" style="display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px;">
+                                <button class="btn btn-outline btn-sm" id="schedulePrev">Prev</button>
+                                <span id="schedulePageLabel" style="font-size:12px;color:var(--text-muted);">Page 1/1</span>
+                                <button class="btn btn-outline btn-sm" id="scheduleNext">Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation View -->
+                <div class="view simulation-view" id="simulation">
+                    <div class="view-header">
+                        <h1>What-If Simulation</h1>
+                        <div class="view-actions">
+                            <button class="btn btn-success" id="runSimulation">
+                                <i class="fas fa-play"></i>
+                                Run Simulation
+                            </button>
+                            <button class="btn btn-outline" id="resetSimulation">
+                                <i class="fas fa-undo"></i>
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="simulation-container">
+                        <div class="simulation-controls">
+                            <div class="control-group">
+                                <label>Scenario Type</label>
+                                <select class="form-control" id="scenarioType">
+                                    <option>Track Blockage</option>
+                                    <option>Train Breakdown</option>
+                                    <option>Weather Disruption</option>
+                                    <option>Signal Failure</option>
+                                    <option>Peak Hour Load</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>Affected Section</label>
+                                <select class="form-control" id="affectedSection">
+                                    <option>Delhi-Gurgaon</option>
+                                    <option>Gurgaon-Jaipur</option>
+                                    <option>Jaipur-Kota</option>
+                                    <option>Kota-Ratlam</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label>Duration (Hours)</label>
+                                <input type="range" class="form-range" min="1" max="24" value="4" id="disruptionDuration">
+                                <span id="durationValue">4 hours</span>
+                            </div>
+                        </div>
+
+                        <div class="simulation-results">
+                            <div class="result-metrics">
+                                <div class="metric">
+                                    <div class="metric-label">Affected Trains</div>
+                                    <div class="metric-value" id="affectedTrains">--</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Average Delay</div>
+                                    <div class="metric-value" id="averageDelay">--</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Throughput Impact</div>
+                                    <div class="metric-value" id="throughputImpact">--</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric-label">Recovery Time</div>
+                                    <div class="metric-value" id="recoveryTime">--</div>
+                                </div>
+                            </div>
+
+                            <div class="simulation-visualization two-col">
+                                <div class="collision-sim">
+                                    <canvas id="collisionSimCanvas"></canvas>
+                                    <div class="mini-caption">Collision avoidance at intersecting tracks</div>
+                                </div>
+                                <div class="delay-chart">
+                                    <canvas id="simulationChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts View -->
+                <div class="view alerts-view" id="alerts">
+                    <div class="view-header">
+                        <h1>System Alerts</h1>
+                        <div class="view-actions" style="gap:8px;">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" placeholder="Search alerts..." id="alertSearch">
+                            </div>
+                            <select class="form-control" id="alertSeverity">
+                                <option value="">All Severities</option>
+                                <option value="Critical">Critical</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                            <select class="form-control" id="alertType">
+                                <option value="">All Types</option>
+                                <option value="Signal">Signal</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Weather">Weather</option>
+                                <option value="Safety">Safety</option>
+                            </select>
+                            <select class="form-control" id="alertStatus">
+                                <option value="">All Status</option>
+                                <option value="Active">Active</option>
+                                <option value="Acknowledged">Acknowledged</option>
+                                <option value="Resolved">Resolved</option>
+                            </select>
+                            <button class="btn btn-outline" id="resetAlertFilters"><i class="fas fa-undo"></i> Reset</button>
+                            <button class="btn btn-success" id="ackAllAlerts"><i class="fas fa-check-double"></i> Acknowledge All</button>
+                            <button class="btn btn-primary" id="resolveAllAlerts"><i class="fas fa-check-circle"></i> Resolve All</button>
+                        </div>
+                    </div>
+
+                    <div class="alerts-container" style="padding: var(--spacing-xl);">
+                        <div class="alerts-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--spacing-md);margin-bottom:var(--spacing-lg);">
+                            <div class="summary-card alert-critical">
+                                <div class="summary-icon"><i class="fas fa-skull-crossbones"></i></div>
+                                <div class="summary-content">
+                                    <div class="summary-value" id="countCritical">0</div>
+                                    <div class="summary-label">Critical</div>
+                                </div>
+                            </div>
+                            <div class="summary-card alert-high">
+                                <div class="summary-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                                <div class="summary-content">
+                                    <div class="summary-value" id="countHigh">0</div>
+                                    <div class="summary-label">High</div>
+                                </div>
+                            </div>
+                            <div class="summary-card alert-medium">
+                                <div class="summary-icon"><i class="fas fa-bell"></i></div>
+                                <div class="summary-content">
+                                    <div class="summary-value" id="countMedium">0</div>
+                                    <div class="summary-label">Medium</div>
+                                </div>
+                            </div>
+                            <div class="summary-card alert-low">
+                                <div class="summary-icon"><i class="fas fa-info-circle"></i></div>
+                                <div class="summary-content">
+                                    <div class="summary-value" id="countLow">0</div>
+                                    <div class="summary-label">Low</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="alertsList" class="alerts-list" style="display:flex;flex-direction:column;gap:12px;"></div>
+                        <div id="alertsEmptyState" style="display:none;padding:24px;text-align:center;color:var(--text-muted);">
+                            <i class="fas fa-bell-slash" style="font-size:22px;opacity:.7;"></i>
+                            <div>No alerts found for the selected filters.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Analytics View -->
+                <div class="view analytics-view" id="analytics">
+                    <div class="view-header">
+                        <h1>Performance Analytics</h1>
+                        <div class="view-actions" style="gap:8px;">
+                            <select class="form-control" id="analyticsPeriod">
+                                <option value="yearly" selected>Yearly (YoY)</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                            <select class="form-control" id="analyticsCorridor">
+                                <option value="all" selected>All Corridors</option>
+                                <option value="DEL-GGN">Delhi–Gurgaon</option>
+                                <option value="GGN-JP">Gurgaon–Jaipur</option>
+                                <option value="JP-KOTA">Jaipur–Kota</option>
+                                <option value="KOTA-RTM">Kota–Ratlam</option>
+                            </select>
+                            <select class="form-control" id="analyticsType">
+                                <option value="all" selected>All Train Types</option>
+                                <option value="Express">Express</option>
+                                <option value="Passenger">Passenger</option>
+                                <option value="Freight">Freight</option>
+                            </select>
+                            <button class="btn btn-primary" id="applyAnalyticsFilters"><i class="fas fa-filter"></i> Apply</button>
+                            <button class="btn btn-outline" id="resetAnalyticsFilters"><i class="fas fa-undo"></i> Reset</button>
+                            <button class="btn btn-success" id="applyLastSimToAnalytics" title="Apply last simulation to analytics"><i class="fas fa-plug"></i> Use Last Simulation</button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-icon"><i class="fas fa-clock"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-value" id="analyticsKpiOnTime">--%</div>
+                                <div class="kpi-label">On-Time Performance</div>
+                                <div class="kpi-change" id="analyticsOnTimeChange">-- vs prev.</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon"><i class="fas fa-hourglass-half"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-value" id="analyticsKpiAvgDelay">-- min</div>
+                                <div class="kpi-label">Average Delay</div>
+                                <div class="kpi-change" id="analyticsAvgDelayChange">-- vs prev.</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon"><i class="fas fa-network-wired"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-value" id="analyticsKpiThroughput">-- tph</div>
+                                <div class="kpi-label">Network Throughput</div>
+                                <div class="kpi-change" id="analyticsThroughputChange">-- vs prev.</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon"><i class="fas fa-times-circle"></i></div>
+                            <div class="kpi-content">
+                                <div class="kpi-value" id="analyticsKpiCancelled">--</div>
+                                <div class="kpi-label">Cancelled Trains</div>
+                                <div class="kpi-change" id="analyticsCancelledChange">-- vs prev.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics Charts Grid -->
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card chart-card">
+                            <div class="card-header">
+                                <h3>On-Time Performance Trend</h3>
+                            </div>
+                            <div class="card-content">
+                                <canvas id="otpChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="dashboard-card chart-card">
+                            <div class="card-header">
+                                <h3>Delay Distribution</h3>
+                            </div>
+                            <div class="card-content">
+                                <canvas id="delayDistChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="dashboard-card chart-card">
+                            <div class="card-header">
+                                <h3>Throughput Over Time</h3>
+                            </div>
+                            <div class="card-content">
+                                <canvas id="throughputChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="dashboard-card chart-card">
+                            <div class="card-header">
+                                <h3>Delay Causes Breakdown</h3>
+                            </div>
+                            <div class="card-content">
+                                <canvas id="delayCauseChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- New Scenario Impact Chart -->
+                        <div class="dashboard-card chart-card">
+                            <div class="card-header">
+                                <h3>Scenario Impact (Baseline vs Simulation)</h3>
+                            </div>
+                            <div class="card-content">
+                                <canvas id="scenarioImpactChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- End Performance Analytics View -->
+            </div>
+        </main>
+
+        <!-- Floating Action Button -->
+        <button class="fab" title="Emergency Actions">
+            <i class="fas fa-exclamation-triangle"></i>
+        </button>
+
+    </div>
+
+    <!-- Government Footer -->
+    <footer class="gov-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <div class="footer-logo">
+                    <img src="indian_railways_logo.png" alt="Indian Railways Logo" class="gov-logo">
+                    <div class="footer-org">
+                        <span class="footer-title">Ministry of Railways</span>
+                        <span class="footer-subtitle">Government of India</span>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-section">
+                <div class="footer-links">
+                    <a href="#" class="footer-link">Privacy Policy</a>
+                    <a href="#" class="footer-link">Terms of Service</a>
+                    <a href="#" class="footer-link">Accessibility</a>
+                    <a href="#" class="footer-link">Contact Us</a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <div class="footer-info">
+                    <p>© 2025 Government of India. All rights reserved.</p>
+                    <p>Last updated: <span id="lastUpdated">September 28, 2025</span></p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay (initially hidden) -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Initializing Railway TMS</div>
+            <div class="loading-subtext">Connecting to network systems...</div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Add html2canvas and jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="demo-config.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
