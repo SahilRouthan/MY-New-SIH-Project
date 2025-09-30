@@ -1770,6 +1770,44 @@ class RailwayTMS {
     // =========================
     // Schedule Planning Methods
     // =========================
+    // Detect if fetched text is a Git LFS pointer instead of real JSON
+    _isLfsPointerText(txt) {
+        if (!txt || typeof txt !== 'string') return false;
+        // Typical LFS pointer format starts with this line
+        return /version\s+https:\/\/git-lfs\.github\.com\/spec\/v1/i.test(txt) && /oid\s+sha256:/i.test(txt);
+    }
+
+    // Try to fetch schedules from a URL and return parsed array or null
+    async _fetchSchedulesFrom(url) {
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            // Prefer JSON, but if content-type is not JSON, sniff text for LFS pointer
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+                const raw = await res.json();
+                let items = Array.isArray(raw) ? raw : (raw?.schedules || raw?.data || raw?.items || raw?.records || []);
+                return Array.isArray(items) ? items : [];
+            } else {
+                const text = await res.text();
+                if (this._isLfsPointerText(text)) {
+                    throw new Error('LFS pointer detected');
+                }
+                // Some hosts mislabel JSON; try to parse
+                try {
+                    const raw = JSON.parse(text);
+                    let items = Array.isArray(raw) ? raw : (raw?.schedules || raw?.data || raw?.items || raw?.records || []);
+                    return Array.isArray(items) ? items : [];
+                } catch (e) {
+                    throw new Error('Non-JSON response');
+                }
+            }
+        } catch (e) {
+            console.warn('Schedule fetch failed from', url, e);
+            return null;
+        }
+    }
+
     generateMockSchedules(count = 250) {
         // Produce realistic mock schedule data for UI-only usage
         const pad = (n) => String(n).padStart(2, '0');
@@ -1874,25 +1912,23 @@ class RailwayTMS {
             if (emptyState) emptyState.style.display = 'none';
             if (countEl) countEl.textContent = 'Loading...';
 
-            // Try to fetch schedules.json (preferred)
+            // Try to fetch schedules.json (preferred), with raw.githubusercontent fallback + demo fallback
             let normalized = [];
-            try {
-                const res = await fetch(`schedules.json?v=${Date.now()}`, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-                // If the file is huge, this may take a moment. Parse JSON.
-                const raw = await res.json();
-                let items = Array.isArray(raw)
-                    ? raw
-                    : (raw?.schedules || raw?.data || raw?.items || raw?.records || []);
-                if (!Array.isArray(items)) items = [];
-
-                normalized = items.map(it => this.normalizeSchedule(it)).filter(Boolean);
-            } catch (fetchErr) {
-                console.error('Failed to fetch schedules.json:', fetchErr);
-                // Do not generate mock data here since user asked to load from schedules.json.
-                // We will show an error state below.
+            // 1) Local path (works on Vercel if LFS is checked out, and locally)
+            let items = await this._fetchSchedulesFrom(`schedules.json?v=${Date.now()}`);
+            // 2) If null or looks empty, try GitHub raw fallback (may still return pointer, but try)
+            if (!items || !items.length) {
+                // Default fallback to known repo path; adjust if forked
+                const ghRaw = 'https://raw.githubusercontent.com/SahilRouthan/MY-New-SIH-Project/main/schedules.json';
+                items = await this._fetchSchedulesFrom(`${ghRaw}?v=${Date.now()}`);
             }
+            // 3) Last resort: generate small demo so UI is never empty
+            let usedDemo = false;
+            if (!items || !items.length) {
+                items = this.generateMockSchedules(150);
+                usedDemo = true;
+            }
+            normalized = (items || []).map(it => this.normalizeSchedule(it)).filter(Boolean);
 
             if (!normalized.length) {
                 // Show error and empty state
@@ -1915,6 +1951,11 @@ class RailwayTMS {
 
             // First render
             this.applyScheduleFilters();
+
+            // Indicate demo data usage if applicable
+            if (usedDemo && countEl) {
+                countEl.textContent = `${normalized.length} demo schedules loaded (LFS asset not available on this host)`;
+            }
         } catch (err) {
             console.error('Failed to load schedules:', err);
             const tbody = document.getElementById('scheduleTableBody');
