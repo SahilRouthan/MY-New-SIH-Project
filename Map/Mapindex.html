@@ -842,6 +842,53 @@
         }
       }
     }
+
+    // Detect if a fetched text is a Git LFS pointer file
+    function isLfsPointer(text) {
+      if (!text || typeof text !== 'string') return false;
+      return /version\s+https:\/\/git-lfs\.github\.com\/spec\/v1/.test(text);
+    }
+
+    // Smart JSON/GeoJSON fetcher: tries relative path first, then falls back to raw.githubusercontent.com on GitHub Pages
+    async function fetchAndParseJSON(relPath) {
+      // Try relative fetch first
+      try {
+        const res = await fetch(relPath, { cache: 'no-store' });
+        if (res.ok) {
+          const text = await res.text();
+          const parsed = parseJsonLoose(text);
+          if (parsed && !isLfsPointer(text)) {
+            return parsed;
+          }
+          // If LFS pointer or parse failure, try raw fallback
+        }
+      } catch {}
+
+      // Build raw URL fallback (works around GitHub Pages not serving LFS content)
+      try {
+        const isGhPages = /\.github\.io$/i.test(location.hostname);
+        let owner = '', repo = '', branch = 'main';
+        if (isGhPages) {
+          owner = location.hostname.split('.')[0];
+          const parts = location.pathname.split('/').filter(Boolean);
+          repo = parts[0] || '';
+        } else {
+          // Fallback defaults (update if repo name/user changes)
+          owner = 'SahilRouthan';
+          repo = 'MY-New-SIH-Project';
+        }
+        const pathForRaw = relPath.startsWith('Map/') ? relPath : `Map/${relPath}`;
+        const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${pathForRaw}`;
+        const res2 = await fetch(rawUrl, { cache: 'no-store' });
+        if (!res2.ok) throw new Error(`Raw fetch failed: HTTP ${res2.status}`);
+        const text2 = await res2.text();
+        const parsed2 = parseJsonLoose(text2);
+        return parsed2;
+      } catch (e) {
+        console.error('fetchAndParseJSON fallback failed for', relPath, e);
+        return null;
+      }
+    }
     function toLatLngPair(p) {
       if (!Array.isArray(p) || p.length < 2) return null;
       const a = Number(p[1]); // lat
@@ -1016,15 +1063,10 @@
 
     // Polyline-based realtime simulation from canonical Mapultra_optimized_trains.json
     function startSampleRoutesRealtime(file = 'Mapultra_optimized_trains.json') {
-      return fetch(file)
-        .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}: ${r.statusText}`))
-        .then(t => {
-          console.log(`Loaded ${file}, size: ${t.length} chars`);
-          return parseJsonLoose(t);
-        })
+      return fetchAndParseJSON(file)
         .then(json => {
           if (!json) throw new Error('JSON parsing returned null');
-          console.log('Parsed JSON structure:', Object.keys(json));
+          try { console.log('Parsed JSON structure:', Object.keys(json)); } catch {}
           
           // Handle different JSON structures
           let trains = [];
@@ -1319,9 +1361,8 @@
     async function loadRailways() {
       try {
         updateLoadingStep(0, 'Loading Railway Network...', 'Fetching MapRailways_indian.geojson (~2MB)');
-        const res = await fetch('MapRailways_indian.geojson');
-        if (!res.ok) throw new Error(`Railways file fetch failed: HTTP ${res.status}`);
-        const geo = await res.json();
+        const geo = await fetchAndParseJSON('MapRailways_indian.geojson');
+        if (!geo) throw new Error('Railways file parse failed (possibly LFS pointer)');
         updateLoadingStep(1, 'Building Railway Graph...', 'Processing railway nodes and connections');
         // Draw light-weight rail layer for context
         if (railwayLayer) { try { map.removeLayer(railwayLayer); } catch {} }
@@ -1362,18 +1403,16 @@
         const tryUrls = ['Mapstation.geojson','Maprailway_station.geojson','Mapstations.json'];
         for (const u of tryUrls) {
           try {
-            const res = await fetch(u);
-            if (!res.ok) continue;
+            const json = await fetchAndParseJSON(u);
+            if (!json) continue;
             if (u.endsWith('.json')) {
-              const text = await res.text();
-              const json = parseJsonLoose(text);
               const arr = Array.isArray(json) ? json : (json && Array.isArray(json.data) ? json.data : []);
               const feats = (arr || []).map(o => ({ type:'Feature', geometry:{ type:'Point', coordinates:[Number(o.lon ?? o.lng), Number(o.lat)] }, properties:{ name: o.name || o.station_name || o['Station Name'] || '' } }));
               populateStationIndex(feats);
               updateLoadingStep(2, 'Stations Loaded', `${feats.length} stations indexed`);
               return;
             } else {
-              const geo = await res.json();
+              const geo = json;
               const pts = Array.isArray(geo.features) ? geo.features.filter(f => f.geometry && f.geometry.type==='Point') : [];
               populateStationIndex(pts);
               updateLoadingStep(2, 'Stations Loaded', `${pts.length} stations indexed`);
