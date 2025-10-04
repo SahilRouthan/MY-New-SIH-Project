@@ -729,23 +729,23 @@ html { scroll-behavior: smooth; }
 }
 
 .kpi-card {
-    background: rgba(255, 255, 255, 0.25);
-    backdrop-filter: blur(30px);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: none;
     border-radius: var(--radius-lg);
     padding: var(--spacing-xl);
     display: flex;
     align-items: center;
     gap: var(--spacing-lg);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     transition: all var(--transition-base);
     position: relative;
     border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .kpi-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 48px rgba(31, 38, 135, 0.5);
-    background: rgba(255, 255, 255, 0.35);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background: rgba(255, 255, 255, 1);
 }
 
 .kpi-icon {
@@ -796,10 +796,10 @@ html { scroll-behavior: smooth; }
 }
 
 .dashboard-card {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: none;
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
     transition: all var(--transition-base);
     border: 1px solid rgba(52, 152, 219, 0.2);
@@ -808,9 +808,9 @@ html { scroll-behavior: smooth; }
 }
 
 .dashboard-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 16px 48px rgba(52, 152, 219, 0.25);
-    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background: rgba(255, 255, 255, 1);
 }
 
 .chart-card {
@@ -819,13 +819,13 @@ html { scroll-behavior: smooth; }
 
 .card-header {
     padding: var(--spacing-xl);
-    border-bottom: 1px solid rgba(52, 152, 219, 0.2);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06); /* subtle divider */
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(248, 250, 252, 0.8);
-    backdrop-filter: blur(20px);
-    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+    background: transparent; /* flatten */
+    backdrop-filter: none;    /* remove glass effect */
+    box-shadow: none;         /* no header shadow */
 }
 
 .card-header h3 {
@@ -859,8 +859,9 @@ html { scroll-behavior: smooth; }
     align-items: center;
     gap: var(--spacing-md);
     padding: var(--spacing-md);
-    background: var(--gray-50);
+    background: #fff;
     border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
     transition: var(--transition-base);
     font-weight: 600;
     color: var(--gray-800);
@@ -868,7 +869,9 @@ html { scroll-behavior: smooth; }
 
 .network-item:hover {
     background: var(--gray-100);
+    background: #fff;
     color: var(--gray-900);
+    box-shadow: var(--shadow-sm);
 }
 
 .network-status {
@@ -901,15 +904,18 @@ html { scroll-behavior: smooth; }
     align-items: center;
     gap: var(--spacing-md);
     padding: var(--spacing-md);
-    background: var(--gray-50);
+    background: #fff;
     border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
     border-left: 4px solid var(--primary-color);
     transition: var(--transition-base);
 }
 
 .recommendation-item:hover {
     background: var(--gray-100);
-    transform: translateX(4px);
+    background: #fff;
+    transform: translateX(2px);
+    box-shadow: var(--shadow-sm);
 }
 
 .rec-icon {
@@ -1982,9 +1988,10 @@ footer *,
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
     background: rgba(255, 255, 255, 0.95);
-}
+    background: #fff;
+    backdrop-filter: none;
 
-/* Severity accents */
+    box-shadow: var(--shadow-sm);
 .sev-critical { border-left-color: #dc3545; }
 .sev-high { border-left-color: #fd7e14; }
 .sev-medium { border-left-color: #ffc107; }
