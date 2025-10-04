@@ -1,5 +1,7 @@
 # Smart Railway Traffic Management System - UI Documentation
 
+[![testsprite](https://github.com/SahilRouthan/MY-New-SIH-Project/actions/workflows/testsprite.yml/badge.svg?branch=main)](https://github.com/SahilRouthan/MY-New-SIH-Project/actions/workflows/testsprite.yml)
+
 ## Overview
 This is a world-class user interface for the Smart Railway Traffic Management System designed for Indian Railways. The system provides real-time monitoring, AI-powered decision support, and comprehensive analytics for train traffic controllers.
 
