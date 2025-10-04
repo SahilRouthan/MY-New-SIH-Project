@@ -1048,10 +1048,10 @@
       ctx.lineWidth = 0.5;
       // Triangle similar to SVG: tip up
       ctx.beginPath();
-      ctx.moveTo(0, -9);
-      ctx.lineTo(8, 9);
-      ctx.lineTo(0, 4);
-      ctx.lineTo(-8, 9);
+      ctx.moveTo(0, -11);
+      ctx.lineTo(10, 11);
+      ctx.lineTo(0, 5);
+      ctx.lineTo(-10, 11);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -1388,7 +1388,36 @@
       try {
         const json = window.EMBEDDED_MINI_TRAIN_DATA;
         if (!json) throw new Error('No embedded dataset');
-        const trains = Array.isArray(json?.trains) ? json.trains : (Array.isArray(json) ? json : []);
+        const trains = Array.isArray(json?.trains) ? [...json.trains] : (Array.isArray(json) ? [...json] : []);
+        // If too few demo trains, synthesize additional routes across major corridors
+        if (trains.length < 12) {
+          const corridors = [
+            { id: 'NDLS-BCT', name: 'Delhi–Mumbai', coords: [[77.2090,28.6139],[75.8648,25.2138],[73.1812,22.3072],[72.8777,19.0760]] },
+            { id: 'NDLS-HWH', name: 'Delhi–Howrah', coords: [[77.2090,28.6139],[80.9462,26.8467],[83.0033,25.3176],[88.3639,22.5726]] },
+            { id: 'CSTM-PUNE', name: 'Mumbai–Pune', coords: [[72.8777,19.0760],[73.8567,18.5204]] },
+            { id: 'MAS-SBC', name: 'Chennai–Bengaluru', coords: [[80.2707,13.0827],[77.5946,12.9716]] },
+            { id: 'MAS-CBE', name: 'Chennai–Coimbatore', coords: [[80.2707,13.0827],[79.1333,12.9166],[78.7047,11.3410]] },
+            { id: 'SBC-MYS', name: 'Bengaluru–Mysuru', coords: [[77.5946,12.9716],[76.6394,12.2958]] },
+            { id: 'SC-BZA', name: 'Hyderabad–Vijayawada', coords: [[78.4867,17.3850],[80.6480,16.5062]] },
+            { id: 'ADI-BRC', name: 'Ahmedabad–Vadodara', coords: [[72.5714,23.0225],[73.1812,22.3072]] },
+            { id: 'LKO-PNBE', name: 'Lucknow–Patna', coords: [[80.9462,26.8467],[85.1376,25.5941]] },
+            { id: 'JP-UDZ', name: 'Jaipur–Udaipur', coords: [[75.7873,26.9124],[73.7125,24.5854]] },
+            { id: 'NDLS-JAT', name: 'Delhi–Jammu', coords: [[77.2090,28.6139],[74.7973,34.0837]] },
+            { id: 'BBS-VSKP', name: 'Bhubaneswar–Visakhapatnam', coords: [[85.8245,20.2961],[83.2185,17.6868]] }
+          ];
+          const baseStart = 7 * 3600; // 07:00
+          let offset = 0;
+          for (const c of corridors) {
+            trains.push({
+              id: `DEMO-${c.id}`,
+              train_name: `${c.name} Demo`,
+              route_coordinates: c.coords,
+              departure: new Date((baseStart + offset) * 1000).toISOString().substring(11,16),
+              arrival: new Date((baseStart + offset + 7200) * 1000).toISOString().substring(11,16)
+            });
+            offset += 1800; // stagger by 30 minutes
+          }
+        }
         if (!trains.length) throw new Error('Embedded dataset empty');
 
         sampleSimRoutes = [];
@@ -1423,8 +1452,8 @@
         setStatus('Running in demo mode (embedded data).');
 
         // Simple realtime loop mirroring the main simulation
-        let tickCount = 0;
-        const speedMultiplier = 1.2;
+  let tickCount = 0;
+  const speedMultiplier = 1.6;
         // Simple FPS tracker
         let frames = 0;
         let lastFPSTime = performance.now();
