@@ -1566,6 +1566,8 @@
 
     async function loadTrainsWithFallback() {
       const candidates = [
+        // Prefer curated small non-LFS sample first for static hosts
+        'Mapreal_trains_sample.json',
         // Favor smallest payloads when in lite mode
         ...(SimConfig.LITE_MODE ? ['Mapminimal_trains.json','Mapultra_optimized_trains.json','Mapoptimized_trains.json'] : ['Mapultra_optimized_trains.json','Mapoptimized_trains.json','Mapminimal_trains.json'])
       ];

@@ -2,3 +2,6 @@
 *.json filter=lfs diff=lfs merge=lfs -text
 *.mp4 filter=lfs diff=lfs merge=lfs -text
 *.psd filter=lfs diff=lfs merge=lfs -text
+
+# Exclude curated small sample from LFS so static hosts can serve it
+Mapreal_trains_sample.json -filter -diff -merge text

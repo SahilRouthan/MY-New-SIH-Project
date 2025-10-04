@@ -1,0 +1,51 @@
+{
+  "trains": [
+    {
+      "id": "12001",
+      "train_name": "Shatabdi Express",
+      "route_coordinates": [
+        [77.2090, 28.6139],
+        [76.6497, 27.2153],
+        [75.8648, 25.2138],
+        [75.0367, 23.3315]
+      ],
+      "departure": "06:00",
+      "arrival": "10:30"
+    },
+    {
+      "id": "12951",
+      "train_name": "Mumbai Rajdhani",
+      "route_coordinates": [
+        [72.8777, 19.0760],
+        [73.1812, 22.3072],
+        [75.8648, 25.2138],
+        [75.7873, 26.9124],
+        [77.2090, 28.6139]
+      ],
+      "departure": "16:25",
+      "arrival": "08:15"
+    },
+    {
+      "id": "12215",
+      "train_name": "Garib Rath",
+      "route_coordinates": [
+        [80.2707, 13.0827],
+        [78.7047, 11.3410],
+        [77.5946, 12.9716]
+      ],
+      "departure": "09:45",
+      "arrival": "13:10"
+    },
+    {
+      "id": "12841",
+      "train_name": "Coromandel Express",
+      "route_coordinates": [
+        [88.3639, 22.5726],
+        [85.8245, 20.2961],
+        [83.2185, 17.6868]
+      ],
+      "departure": "07:20",
+      "arrival": "15:50"
+    }
+  ]
+}
