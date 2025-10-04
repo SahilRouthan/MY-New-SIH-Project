@@ -689,7 +689,7 @@
   }
 
     // Zoom-based visibility: show markers only when zoomed in enough
-    const markerVisibilityZoom = 4; // Visible from default zoom for better simulation
+  const markerVisibilityZoom = 3.5; // Slightly lower threshold to ensure visibility at startup
     const stationVisibilityZoom = 12; // Much higher zoom required to see stations (avoid clutter)
   // Train markers always visible (toggle removed)
       let showTrainMarkers = true; // always visible for main simulation
@@ -1086,6 +1086,8 @@
       map.on('move zoom zoomend viewreset resize', () => { resizeCanvas(); onMove(); });
       // Initial paint
       requestRepaint();
+      // Kick a repaint after tiles load and container has final size
+      map.once('load', () => { setTimeout(() => { resizeCanvas(); requestRepaint(); }, 100); });
     }
 
     // Polyline-based realtime simulation from canonical Mapultra_optimized_trains.json
@@ -1453,14 +1455,22 @@
 
         // Simple realtime loop mirroring the main simulation
   let tickCount = 0;
-  const speedMultiplier = 1.6;
+  // Fast virtual clock so demo always shows motion regardless of local time
+  const speedMultiplier = 720; // 24 hours simulated in ~2 minutes
+  let lastTs = performance.now();
+  let simClock = 0; // start-of-day; will advance quickly
         // Simple FPS tracker
         let frames = 0;
         let lastFPSTime = performance.now();
         const loop = () => {
-          const baseNow = nowSecOfDay() * speedMultiplier;
+          // Advance virtual clock
+          const nowTs = performance.now();
+          const dt = Math.min(0.25, (nowTs - lastTs) / 1000);
+          lastTs = nowTs;
+          simClock = (simClock + dt * speedMultiplier) % 86400;
+          const baseNow = simClock;
           const showByZoom = map.getZoom() >= markerVisibilityZoom;
-          const offsets = [-86400, 0, 86400];
+          const offsets = [0];
           let active = 0;
           for (const tr of sampleSimRoutes) {
             let pos = null;
