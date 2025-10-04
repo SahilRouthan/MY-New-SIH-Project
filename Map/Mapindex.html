@@ -1425,6 +1425,9 @@
         // Simple realtime loop mirroring the main simulation
         let tickCount = 0;
         const speedMultiplier = 1.2;
+        // Simple FPS tracker
+        let frames = 0;
+        let lastFPSTime = performance.now();
         const loop = () => {
           const baseNow = nowSecOfDay() * speedMultiplier;
           const showByZoom = map.getZoom() >= markerVisibilityZoom;
@@ -1467,8 +1470,24 @@
             }
             trainPositions.set(id, { pos: finalPos, rotation });
           }
-          try { renderTrainsCanvas(sampleSimRoutes, trainPositions, showByZoom); } catch {}
+          try {
+            // Always request repaint for canvas renderer
+            requestRepaint();
+            renderTrainsCanvas(sampleSimRoutes, trainPositions, showByZoom);
+          } catch {}
           tickCount++;
+          // Update FPS and train counters ~1s
+          frames++;
+          const now = performance.now();
+          if (now - lastFPSTime >= 1000) {
+            const fps = Math.round((frames * 1000) / (now - lastFPSTime));
+            const fpsEl = document.getElementById('fps');
+            const countEl = document.getElementById('trainCount');
+            if (fpsEl) fpsEl.textContent = String(fps);
+            if (countEl) countEl.textContent = String(active);
+            frames = 0;
+            lastFPSTime = now;
+          }
           setTimeout(loop, 1000 / SimConfig.TARGET_FPS);
         };
         loop();
