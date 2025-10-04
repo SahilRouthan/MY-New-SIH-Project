@@ -201,3 +201,42 @@ This project is developed for Smart India Hackathon 2024 and follows the competi
 ---
 
 *This UI represents the cutting-edge of web-based railway management systems, combining modern design principles with practical functionality for real-world railway operations.*
+
+---
+
+## Local test sprite (Playwright smoke tests)
+
+This repo includes a lightweight "testsprite" to validate key flows locally using Playwright.
+
+What it does:
+- Serves the project statically on http://localhost:5173
+- Opens the app and checks:
+    - Dashboard header and KPI cards appear
+    - Network Overview iframe loads and the inner map container exists
+    - Schedule Planning shows rows (real schedules.json or demo fallback)
+
+Prerequisites:
+- Node.js 18+
+
+Setup (Windows PowerShell):
+
+```powershell
+npm install
+npx playwright install --with-deps
+```
+
+Run tests headless:
+
+```powershell
+npm run testsprite
+```
+
+Run tests with browser UI:
+
+```powershell
+npm run testsprite:headed
+```
+
+Troubleshooting:
+- If the Network Overview test is flaky, it’s usually due to remote data fallback timing. Increase waits in `tests/smoke.spec.ts` if needed.
+- The schedule test allows demo fallback, so it should always pass even if `schedules.json` is LFS on the host.
