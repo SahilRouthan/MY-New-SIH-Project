@@ -291,7 +291,10 @@
         TRAIN_SAMPLE_LIMIT: Number(q.get('sampleLimit') ?? (LITE_MODE ? 50 : 75)),
         ROUTE_SIMPLIFY_KM: Number(q.get('simplifyKm') ?? (LITE_MODE ? 3 : 1)),
         SNAP_STRICT_EVERY_N: Number(q.get('snapEvery') ?? (LITE_MODE ? 3 : 1)),
-        TARGET_FPS: Math.min(60, Math.max(20, Number(q.get('fps') ?? 40)))
+        TARGET_FPS: Math.min(60, Math.max(20, Number(q.get('fps') ?? 40))),
+        MAX_KMH: Math.max(40, Number(q.get('maxKmh') ?? 130)), // cap for logical passenger speeds
+        MIN_KMH: Math.max(5, Number(q.get('minKmh') ?? 20)),   // avoid crawling
+        SPEED_SCALE: Math.max(0.25, Number(q.get('speed') ?? 1)) // 1=realistic, >1 faster demo
       };
     })();
 
@@ -1146,23 +1149,22 @@
               coords = simplifyPolylineKm(coords, SimConfig.ROUTE_SIMPLIFY_KM);
             }
             const { cum, total } = computeCumulativeKm(coords);
-            // Determine timing - be more flexible with time parsing
+            // Determine timing logically from distance if missing or unrealistic
             let t0 = parseHMSToSec(tr.departure);
             let t1 = parseHMSToSec(tr.arrival);
-            if (t0 == null || t1 == null) {
-              const st = Array.isArray(tr.stations) ? tr.stations : [];
-              const s0 = st.find(s => parseHMSToSec(s.departure) != null);
-              const s1 = [...st].reverse().find(s => parseHMSToSec(s.arrival) != null);
-              t0 = t0 ?? (s0 ? parseHMSToSec(s0.departure) : null);
-              t1 = t1 ?? (s1 ? parseHMSToSec(s1.arrival) : null);
+            const st = Array.isArray(tr.stations) ? tr.stations : [];
+            if (t0 == null) { const s0 = st.find(s => parseHMSToSec(s.departure) != null); t0 = s0 ? parseHMSToSec(s0.departure) : null; }
+            if (t1 == null) { const s1 = [...st].reverse().find(s => parseHMSToSec(s.arrival) != null); t1 = s1 ? parseHMSToSec(s1.arrival) : null; }
+            // Compute duration from distance and bounded km/h
+            const avgKmh = Math.min(SimConfig.MAX_KMH, Math.max(SimConfig.MIN_KMH, (tr.max_speed || tr.speed || 80)));
+            const durationSecFromKmh = Math.max(900, (total / avgKmh) * 3600); // at least 15 minutes
+            if (t0 == null || t1 == null || t1 <= t0 || (t1 - t0) < 0.5 * durationSecFromKmh || (t1 - t0) > 2.5 * durationSecFromKmh) {
+              // Reset to logical window in the day based on id hash
+              const seed = Math.abs([...id].reduce((a,c)=>a + c.charCodeAt(0),0)) % 86400;
+              t0 = (seed % (20*3600)); // between 00:00 and 20:00
+              t1 = t0 + durationSecFromKmh;
             }
-            // If still no times, use default 24-hour cycle for demo
-            if (t0 == null || t1 == null) {
-              console.warn(`Train ${id}: using default times (no departure/arrival found)`);
-              t0 = Math.random() * 86400; // Random start time in 24h
-              t1 = t0 + (3600 + Math.random() * 7200); // 1-3 hour journey
-            }
-            if (t1 <= t0) t1 += 86400; // unwrap midnight
+            if (t1 <= t0) t1 = t0 + durationSecFromKmh;
             sampleSimRoutes.push({ id, name, coords, cum, totalKm: total, t0, t1 });
             added++;
             if (added <= 5) { // Log first few trains only
@@ -1232,7 +1234,7 @@
                 const tNow = baseNow + off;
                 if (tNow < tr.t0 || tNow > tr.t1) continue;
                 const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
-                const targetKm = r * tr.totalKm;
+                const targetKm = r * tr.totalKm * SimConfig.SPEED_SCALE;
                 pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
                 // Strict snapping at configured cadence to reduce CPU
                 if (pos) {
@@ -1441,10 +1443,17 @@
           // Light simplification
           if (coords.length > 5) coords = simplifyPolylineKm(coords, 2);
           const { cum, total } = computeCumulativeKm(coords);
-          // Timing
-          let t0 = parseHMSToSec(tr.departure) ?? (8 * 3600);
-          let t1 = parseHMSToSec(tr.arrival) ?? (t0 + 7200);
-          if (t1 <= t0) t1 = t0 + 3600;
+          // Logical timing based on distance and bounded km/h
+          let t0 = parseHMSToSec(tr.departure);
+          let t1 = parseHMSToSec(tr.arrival);
+          const avgKmh = Math.min(SimConfig.MAX_KMH, Math.max(SimConfig.MIN_KMH, 80));
+          const durationSecFromKmh = Math.max(900, (total / avgKmh) * 3600);
+          if (t0 == null || t1 == null || t1 <= t0) {
+            const seed = Math.abs([...id].reduce((a,c)=>a + c.charCodeAt(0),0)) % 86400;
+            t0 = (seed % (20*3600));
+            t1 = t0 + durationSecFromKmh;
+          }
+          if (t1 <= t0) t1 = t0 + durationSecFromKmh;
           sampleSimRoutes.push({ id, name, coords, cum, totalKm: total, t0, t1 });
           added++;
         }
@@ -1478,7 +1487,7 @@
               const tNow = baseNow + off;
               if (tNow < tr.t0 || tNow > tr.t1) continue;
               const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
-              const targetKm = r * tr.totalKm;
+              const targetKm = r * tr.totalKm * SimConfig.SPEED_SCALE;
               pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
               if (pos) {
                 const snapped = snapToTrackStrict(pos[0], pos[1]);
