@@ -908,6 +908,7 @@
         const res2 = await fetch(rawUrl, { cache: 'no-store' });
         if (!res2.ok) throw new Error(`Raw fetch failed: HTTP ${res2.status}`);
         const text2 = await res2.text();
+        if (isLfsPointer(text2)) throw new Error('Raw URL returned LFS pointer');
         const parsed2 = parseJsonLoose(text2);
         return parsed2;
       } catch (e) {
@@ -1387,8 +1388,9 @@
       try {
         const json = window.EMBEDDED_MINI_TRAIN_DATA;
         if (!json) throw new Error('No embedded dataset');
-        let trains = Array.isArray(json?.trains) ? json.trains : (Array.isArray(json) ? json : []);
+        const trains = Array.isArray(json?.trains) ? json.trains : (Array.isArray(json) ? json : []);
         if (!trains.length) throw new Error('Embedded dataset empty');
+
         sampleSimRoutes = [];
         const sampleLimit = 25;
         let added = 0;
@@ -1396,6 +1398,7 @@
           if (added >= sampleLimit) break;
           const id = String(tr.train_number ?? tr.id ?? tr.trainName ?? Math.random().toString(36).slice(2));
           const name = String(tr.train_name ?? tr.name ?? id);
+          // Build polyline
           let coords = [];
           if (Array.isArray(tr.route_coordinates) && tr.route_coordinates.length >= 2) {
             coords = tr.route_coordinates.map(toLatLngPair).filter(Boolean);
@@ -1404,20 +1407,71 @@
             coords = tr.stations.map(s => [Number(s.lat), Number(s.lon)]).filter(([la, ln]) => isFinite(la) && isFinite(ln));
           }
           if (coords.length < 2) continue;
+          // Light simplification
+          if (coords.length > 5) coords = simplifyPolylineKm(coords, 2);
           const { cum, total } = computeCumulativeKm(coords);
+          // Timing
           let t0 = parseHMSToSec(tr.departure) ?? (8 * 3600);
           let t1 = parseHMSToSec(tr.arrival) ?? (t0 + 7200);
           if (t1 <= t0) t1 = t0 + 3600;
           sampleSimRoutes.push({ id, name, coords, cum, totalKm: total, t0, t1 });
           added++;
         }
+        if (!sampleSimRoutes.length) throw new Error('No routes in embedded dataset');
+
         console.log(`Started embedded demo with ${sampleSimRoutes.length} trains`);
-        // Kick simulation
-        (function startSimulation() {
-          try { renderTrainsCanvas(sampleSimRoutes, trainPositions, map.getZoom() >= markerVisibilityZoom); } catch {}
-          // Minimal tick to keep markers updated if any created later
-          setTimeout(startSimulation, 1000 / SimConfig.TARGET_FPS);
-        })();
+        setStatus('Running in demo mode (embedded data).');
+
+        // Simple realtime loop mirroring the main simulation
+        let tickCount = 0;
+        const speedMultiplier = 1.2;
+        const loop = () => {
+          const baseNow = nowSecOfDay() * speedMultiplier;
+          const showByZoom = map.getZoom() >= markerVisibilityZoom;
+          const offsets = [-86400, 0, 86400];
+          let active = 0;
+          for (const tr of sampleSimRoutes) {
+            let pos = null;
+            for (const off of offsets) {
+              const tNow = baseNow + off;
+              if (tNow < tr.t0 || tNow > tr.t1) continue;
+              const r = (tNow - tr.t0) / (tr.t1 - tr.t0);
+              const targetKm = r * tr.totalKm;
+              pos = posAlongPolyline(tr.coords, tr.cum, targetKm);
+              if (pos) {
+                const snapped = snapToTrackStrict(pos[0], pos[1]);
+                pos = [snapped.lat, snapped.lng];
+              }
+              break;
+            }
+            if (!pos) continue;
+            active++;
+            const id = String(tr.id);
+            // Smooth interpolation + rotation
+            let rotation = 0;
+            let finalPos = pos;
+            if (trainPositions.has(id)) {
+              const prev = trainPositions.get(id);
+              const prevPos = prev.pos || [prev[0], prev[1]];
+              finalPos = [
+                prevPos[0] + (pos[0] - prevPos[0]) * 0.4,
+                prevPos[1] + (pos[1] - prevPos[1]) * 0.4
+              ];
+              const dx = pos[1] - prevPos[1];
+              const dy = pos[0] - prevPos[0];
+              if (Math.abs(dx) > 0.0001 || Math.abs(dy) > 0.0001) {
+                rotation = Math.atan2(dx, dy) * (180 / Math.PI);
+              } else {
+                rotation = prev.rotation || 0;
+              }
+            }
+            trainPositions.set(id, { pos: finalPos, rotation });
+          }
+          try { renderTrainsCanvas(sampleSimRoutes, trainPositions, showByZoom); } catch {}
+          tickCount++;
+          setTimeout(loop, 1000 / SimConfig.TARGET_FPS);
+        };
+        loop();
         return true;
       } catch (e) {
         console.error('Embedded fallback failed:', e);
